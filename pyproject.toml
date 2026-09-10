@@ -1,0 +1,20 @@
+[tool.uv.workspace]
+members = [
+  "apps/gateway",
+  "services/identity-service",
+  "services/vendor-service",
+  "services/catalog-service",
+  "services/media-service",
+  "services/admin-service",
+  "packages/shared-python"
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "."
+]
+

@@ -1,0 +1,126 @@
+name: 🐳 Build and Push Docker Images
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  validate:
+    name: 🔍 Validate Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: 📦 Install Python dependencies
+      run: |
+        pip install black flake8 mypy
+        pip install -e packages/shared-python
+    
+    - name: 🧹 Lint Python code
+      run: |
+        echo "Running Python linting..."
+        black --check apps/gateway services/
+        flake8 apps/gateway services/
+    
+    - name: ⚛️ Set up Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: 📦 Install Node.js dependencies
+      run: |
+        cd apps/web
+        npm ci
+    
+    - name: 🧹 Lint web application
+      run: |
+        cd apps/web
+        npm run lint
+    
+    - name: 🐳 Validate Docker Compose configuration
+      run: |
+        docker compose config --quiet
+
+  build-and-push:
+    name: 🐳 Build and Push Images
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    
+    strategy:
+      matrix:
+        service: 
+          - web
+          - gateway
+          - identity-service
+          - vendor-service
+          - catalog-service
+          - media-service
+          - admin-service
+        include:
+          - service: web
+            dockerfile: infra/docker/web.Dockerfile
+          - service: gateway
+            dockerfile: apps/gateway/Dockerfile
+          - service: identity-service
+            dockerfile: services/identity-service/Dockerfile
+          - service: vendor-service
+            dockerfile: services/vendor-service/Dockerfile
+          - service: catalog-service
+            dockerfile: services/catalog-service/Dockerfile
+          - service: media-service
+            dockerfile: services/media-service/Dockerfile
+          - service: admin-service
+            dockerfile: services/admin-service/Dockerfile
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: 🔐 Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ vars.AZURE_CLIENT_ID }}
+        tenant-id: ${{ vars.AZURE_TENANT_ID }}
+        subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    
+    - name: 🐳 Login to Azure Container Registry
+      uses: azure/docker-login@v2
+      with:
+        login-server: ${{ vars.ACR_LOGIN_SERVER }}
+        username: ${{ vars.AZURE_CLIENT_ID }}
+        password: ${{ secrets.AZURE_CLIENT_SECRET }}
+    
+    - name: 🏷️ Extract metadata for Docker tags
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ vars.ACR_LOGIN_SERVER }}/${{ matrix.service }}
+        tags: |
+          type=sha,prefix=
+          type=ref,event=tag
+    
+    - name: 🛠️ Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: 🐳 Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ${{ matrix.dockerfile }}
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64

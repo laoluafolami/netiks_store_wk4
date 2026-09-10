@@ -1,0 +1,134 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "${WEB_EXPOSE_PORT:-3001}:3000"
+    depends_on:
+      gateway:
+        condition: service_started
+
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    env_file:
+      - .env
+    environment:
+      APP_NAME: gateway
+      APP_PORT: 8000
+      IDENTITY_SERVICE_URL: ${IDENTITY_SERVICE_URL:-http://identity-service:8001}
+      VENDOR_SERVICE_URL: ${VENDOR_SERVICE_URL:-http://vendor-service:8002}
+      CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://catalog-service:8003}
+      MEDIA_SERVICE_URL: ${MEDIA_SERVICE_URL:-http://media-service:8004}
+    ports:
+      - "8000:8000"
+    depends_on:
+      identity-service:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: services/identity-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      APP_NAME: identity-service
+      APP_PORT: 8001
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  vendor-service:
+    build:
+      context: .
+      dockerfile: services/vendor-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      APP_NAME: vendor-service
+      APP_PORT: 8002
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  catalog-service:
+    build:
+      context: .
+      dockerfile: services/catalog-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      APP_NAME: catalog-service
+      APP_PORT: 8003
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  media-service:
+    build:
+      context: .
+      dockerfile: services/media-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      APP_NAME: media-service
+      APP_PORT: 8004
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "8004:8004"
+    volumes:
+      - media_uploads:/app/uploads
+
+  admin-service:
+    build:
+      context: .
+      dockerfile: services/admin-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      APP_NAME: admin-service
+      APP_PORT: 8005
+    ports:
+      - "8005:8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-netiks_store}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_EXPOSE_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-netiks_store}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
+  media_uploads:

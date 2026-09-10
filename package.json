@@ -1,0 +1,15 @@
+{
+  "name": "netiks-store",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/shared-types"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @netiks-store/web",
+    "build:web": "npm run build --workspace @netiks-store/web",
+    "lint:web": "npm run lint --workspace @netiks-store/web",
+    "seed:demo": "node scripts/seed-demo-marketplace.mjs"
+  }
+}
