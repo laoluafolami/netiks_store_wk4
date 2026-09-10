@@ -1,4 +1,4 @@
-# Testing CI/CD normal commit
+# Testing CI/CD commit
 from fastapi import FastAPI
 
 from app import models  # noqa: F401
