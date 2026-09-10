@@ -16,7 +16,9 @@ from app.service import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED
+)
 async def register(
     payload: RegisterRequest,
     request: Request,
@@ -74,13 +76,17 @@ async def me(
     session: Session = Depends(get_db_session),
 ) -> dict[str, dict[str, str]]:
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
 
     token = authorization.removeprefix("Bearer ").strip()
     try:
         payload = decode_access_token(token)
     except jwt.PyJWTError as error:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(error)
+        ) from error
     user = get_current_user(session, payload["sub"])
     return {
         "data": {

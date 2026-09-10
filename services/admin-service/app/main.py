@@ -9,5 +9,7 @@ app.include_router(health_router)
 
 @app.get("/admin/summary")
 async def summary() -> dict[str, object]:
-    return {"data": {"users": 0, "stores": 0, "products": 0}, "message": "Admin service scaffold ready"}
-
+    return {
+        "data": {"users": 0, "stores": 0, "products": 0},
+        "message": "Admin service scaffold ready",
+    }

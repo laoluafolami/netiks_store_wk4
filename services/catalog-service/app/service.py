@@ -29,7 +29,9 @@ def list_categories_service(session: Session) -> list[Category]:
 
 def create_category_service(session: Session, payload: CategoryCreate) -> Category:
     if get_category_by_slug(session, payload.slug):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Category slug already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Category slug already exists"
+        )
 
     category = Category(
         name=payload.name.strip(),
@@ -39,26 +41,40 @@ def create_category_service(session: Session, payload: CategoryCreate) -> Catego
     return create_category(session, category)
 
 
-def list_products_service(session: Session, owner_id: str | None = None) -> list[Product]:
+def list_products_service(
+    session: Session, owner_id: str | None = None
+) -> list[Product]:
     if owner_id:
         return list_products_by_owner(session, owner_id)
     return list_published_products(session)
 
 
-def get_product_by_slug_service(session: Session, slug: str, owner_id: str | None = None) -> Product:
+def get_product_by_slug_service(
+    session: Session, slug: str, owner_id: str | None = None
+) -> Product:
     product = get_product_by_slug(session, slug)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     if product.status != "published" and product.owner_id != owner_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     return product
 
 
-def create_product_service(session: Session, owner_id: str, payload: ProductCreate) -> Product:
+def create_product_service(
+    session: Session, owner_id: str, payload: ProductCreate
+) -> Product:
     if get_product_by_slug(session, payload.slug):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Product slug already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Product slug already exists"
+        )
     if not get_category_by_id(session, payload.category_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        )
 
     product = Product(
         store_id=payload.store_id,
@@ -78,17 +94,36 @@ def create_product_service(session: Session, owner_id: str, payload: ProductCrea
     return create_product(session, product)
 
 
-def update_product_service(session: Session, product_id: str, owner_id: str, payload: ProductUpdate) -> Product:
+def update_product_service(
+    session: Session, product_id: str, owner_id: str, payload: ProductUpdate
+) -> Product:
     product = get_product_by_id(session, product_id)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     if product.owner_id != owner_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to update this product")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not allowed to update this product",
+        )
 
-    if payload.category_id is not None and not get_category_by_id(session, payload.category_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    if payload.category_id is not None and not get_category_by_id(
+        session, payload.category_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        )
 
-    for field in ("name", "description", "currency", "sku", "status", "featured_image_url", "category_id"):
+    for field in (
+        "name",
+        "description",
+        "currency",
+        "sku",
+        "status",
+        "featured_image_url",
+        "category_id",
+    ):
         value = getattr(payload, field)
         if value is not None:
             setattr(product, field, value.strip() if isinstance(value, str) else value)
@@ -110,9 +145,13 @@ def list_orders_service(session: Session, owner_id: str) -> list[Order]:
 def checkout_product_service(session: Session, payload: CheckoutCreate) -> Order:
     product = get_product_by_id_for_update(session, payload.product_id)
     if not product or product.status != "published":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     if payload.quantity > product.stock_quantity:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Not enough stock remaining")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Not enough stock remaining"
+        )
 
     quantity = payload.quantity
     unit_price = Decimal(product.price)

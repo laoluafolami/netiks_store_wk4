@@ -3,7 +3,6 @@
 from alembic import op
 import sqlalchemy as sa
 
-
 revision = "20260616_0002"
 down_revision = "20260614_0001"
 branch_labels = None
@@ -30,19 +29,57 @@ def upgrade() -> None:
         sa.Column("quantity", sa.Integer(), nullable=False),
         sa.Column("unit_price", sa.Numeric(10, 2), nullable=False),
         sa.Column("total_price", sa.Numeric(10, 2), nullable=False),
-        sa.Column("payment_method", sa.String(length=40), nullable=False, server_default="demo-card"),
+        sa.Column(
+            "payment_method",
+            sa.String(length=40),
+            nullable=False,
+            server_default="demo-card",
+        ),
         sa.Column("payment_reference", sa.String(length=80), nullable=False),
-        sa.Column("status", sa.String(length=40), nullable=False, server_default="paid"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.ForeignKeyConstraint(["product_id"], ["catalog.products.id"], ondelete="RESTRICT"),
+        sa.Column(
+            "status", sa.String(length=40), nullable=False, server_default="paid"
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+        sa.ForeignKeyConstraint(
+            ["product_id"], ["catalog.products.id"], ondelete="RESTRICT"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("payment_reference"),
         schema="catalog",
     )
-    op.create_index("ix_catalog_orders_product_id", "orders", ["product_id"], unique=False, schema="catalog")
-    op.create_index("ix_catalog_orders_store_id", "orders", ["store_id"], unique=False, schema="catalog")
-    op.create_index("ix_catalog_orders_owner_id", "orders", ["owner_id"], unique=False, schema="catalog")
-    op.create_index("ix_catalog_orders_buyer_email", "orders", ["buyer_email"], unique=False, schema="catalog")
+    op.create_index(
+        "ix_catalog_orders_product_id",
+        "orders",
+        ["product_id"],
+        unique=False,
+        schema="catalog",
+    )
+    op.create_index(
+        "ix_catalog_orders_store_id",
+        "orders",
+        ["store_id"],
+        unique=False,
+        schema="catalog",
+    )
+    op.create_index(
+        "ix_catalog_orders_owner_id",
+        "orders",
+        ["owner_id"],
+        unique=False,
+        schema="catalog",
+    )
+    op.create_index(
+        "ix_catalog_orders_buyer_email",
+        "orders",
+        ["buyer_email"],
+        unique=False,
+        schema="catalog",
+    )
     op.create_index(
         "ix_catalog_orders_payment_reference",
         "orders",
@@ -53,8 +90,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_catalog_orders_payment_reference", table_name="orders", schema="catalog")
-    op.drop_index("ix_catalog_orders_buyer_email", table_name="orders", schema="catalog")
+    op.drop_index(
+        "ix_catalog_orders_payment_reference", table_name="orders", schema="catalog"
+    )
+    op.drop_index(
+        "ix_catalog_orders_buyer_email", table_name="orders", schema="catalog"
+    )
     op.drop_index("ix_catalog_orders_owner_id", table_name="orders", schema="catalog")
     op.drop_index("ix_catalog_orders_store_id", table_name="orders", schema="catalog")
     op.drop_index("ix_catalog_orders_product_id", table_name="orders", schema="catalog")

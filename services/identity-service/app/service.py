@@ -30,7 +30,9 @@ def register_user(session: Session, payload: RegisterRequest):
     email = normalize_email(payload.email)
     existing_user = get_user_by_email(session, email)
     if existing_user:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="User already exists"
+        )
 
     return create_user(
         session,
@@ -44,10 +46,14 @@ def authenticate_user(session: Session, payload: LoginRequest):
     email = normalize_email(payload.email)
     user = get_user_by_email(session, email)
     if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+        )
 
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive"
+        )
 
     return user
 
@@ -55,7 +61,9 @@ def authenticate_user(session: Session, payload: LoginRequest):
 def get_current_user(session: Session, user_id: str):
     user = get_user_by_id(session, user_id)
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
     return user
 
 
@@ -86,9 +94,17 @@ def rotate_refresh_token(
     ip_address: str | None,
 ) -> tuple[User, str]:
     now = datetime.now(UTC)
-    auth_session = get_auth_session_by_refresh_token_hash(session, hash_refresh_token(refresh_token))
-    if not auth_session or auth_session.revoked_at is not None or auth_session.expires_at <= now:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    auth_session = get_auth_session_by_refresh_token_hash(
+        session, hash_refresh_token(refresh_token)
+    )
+    if (
+        not auth_session
+        or auth_session.revoked_at is not None
+        or auth_session.expires_at <= now
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
 
     user = get_current_user(session, auth_session.user_id)
     revoke_auth_session(session, auth_session, revoked_at=now)

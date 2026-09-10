@@ -12,7 +12,9 @@ password_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def create_access_token(*, subject: str, email: str, role: str) -> str:
-    expires_at = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
+    expires_at = datetime.now(UTC) + timedelta(
+        minutes=settings.access_token_expire_minutes
+    )
     payload = {
         "sub": subject,
         "email": email,

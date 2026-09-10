@@ -3,7 +3,6 @@
 from alembic import op
 import sqlalchemy as sa
 
-
 revision = "20260614_0001"
 down_revision = None
 branch_labels = None
@@ -23,15 +22,35 @@ def upgrade() -> None:
         sa.Column("phone", sa.String(length=40), nullable=True),
         sa.Column("logo_url", sa.String(length=255), nullable=True),
         sa.Column("banner_url", sa.String(length=255), nullable=True),
-        sa.Column("status", sa.String(length=40), nullable=False, server_default="active"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "status", sa.String(length=40), nullable=False, server_default="active"
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("slug"),
         schema="vendor",
     )
-    op.create_index("ix_vendor_stores_owner_id", "stores", ["owner_id"], unique=False, schema="vendor")
-    op.create_index("ix_vendor_stores_slug", "stores", ["slug"], unique=False, schema="vendor")
+    op.create_index(
+        "ix_vendor_stores_owner_id",
+        "stores",
+        ["owner_id"],
+        unique=False,
+        schema="vendor",
+    )
+    op.create_index(
+        "ix_vendor_stores_slug", "stores", ["slug"], unique=False, schema="vendor"
+    )
 
 
 def downgrade() -> None:

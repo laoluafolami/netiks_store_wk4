@@ -25,4 +25,6 @@ async def upload_media(file: UploadFile = File(...)) -> dict[str, object]:
 async def get_media(file_id: str) -> FileResponse:
     path = resolve_upload(file_id)
     media_type, _ = guess_type(path.name)
-    return FileResponse(path, media_type=media_type or "application/octet-stream", filename=path.name)
+    return FileResponse(
+        path, media_type=media_type or "application/octet-stream", filename=path.name
+    )

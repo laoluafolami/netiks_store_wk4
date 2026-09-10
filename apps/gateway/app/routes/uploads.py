@@ -26,7 +26,9 @@ async def upload_file(
     }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(f"{settings.media_service_url}/uploads", files=files)
+        response = await client.post(
+            f"{settings.media_service_url}/uploads", files=files
+        )
 
     if response.is_error:
         raise HTTPException(status_code=response.status_code, detail=response.text)

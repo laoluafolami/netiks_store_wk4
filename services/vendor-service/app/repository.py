@@ -5,7 +5,9 @@ from app.models import Store
 
 
 def get_store_by_owner_id(session: Session, owner_id: str) -> Store | None:
-    return session.execute(select(Store).where(Store.owner_id == owner_id)).scalar_one_or_none()
+    return session.execute(
+        select(Store).where(Store.owner_id == owner_id)
+    ).scalar_one_or_none()
 
 
 def get_store_by_slug(session: Session, slug: str) -> Store | None:
@@ -13,11 +15,15 @@ def get_store_by_slug(session: Session, slug: str) -> Store | None:
 
 
 def get_store_by_id(session: Session, store_id: str) -> Store | None:
-    return session.execute(select(Store).where(Store.id == store_id)).scalar_one_or_none()
+    return session.execute(
+        select(Store).where(Store.id == store_id)
+    ).scalar_one_or_none()
 
 
 def list_active_stores(session: Session) -> list[Store]:
-    statement = select(Store).where(Store.status == "active").order_by(Store.created_at.desc())
+    statement = (
+        select(Store).where(Store.status == "active").order_by(Store.created_at.desc())
+    )
     return list(session.execute(statement).scalars().all())
 
 

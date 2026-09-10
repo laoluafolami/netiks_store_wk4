@@ -30,7 +30,9 @@ router = APIRouter(tags=["catalog"])
 
 def require_user_id(x_user_id: str | None) -> str:
     if not x_user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing user context")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing user context"
+        )
     return x_user_id
 
 
@@ -78,8 +80,14 @@ def to_order_response(order) -> dict[str, str | int | None]:
 
 
 @router.get("/categories")
-async def list_categories(session: Session = Depends(get_db_session)) -> dict[str, object]:
-    return {"data": [to_category_response(item) for item in list_categories_service(session)]}
+async def list_categories(
+    session: Session = Depends(get_db_session),
+) -> dict[str, object]:
+    return {
+        "data": [
+            to_category_response(item) for item in list_categories_service(session)
+        ]
+    }
 
 
 @router.post("/categories", status_code=status.HTTP_201_CREATED)
@@ -100,7 +108,12 @@ async def list_products(
     x_user_id: str | None = Header(default=None),
 ) -> dict[str, object]:
     owner_id = require_user_id(x_user_id) if mine else None
-    return {"data": [to_product_response(item) for item in list_products_service(session, owner_id=owner_id)]}
+    return {
+        "data": [
+            to_product_response(item)
+            for item in list_products_service(session, owner_id=owner_id)
+        ]
+    }
 
 
 @router.post("/products", status_code=status.HTTP_201_CREATED)
@@ -122,7 +135,11 @@ async def get_product(
     x_user_id: str | None = Header(default=None),
 ) -> dict[str, object]:
     owner_id = x_user_id if x_user_id else None
-    return {"data": to_product_response(get_product_by_slug_service(session, slug, owner_id=owner_id))}
+    return {
+        "data": to_product_response(
+            get_product_by_slug_service(session, slug, owner_id=owner_id)
+        )
+    }
 
 
 @router.patch("/products/{product_id}")
@@ -132,7 +149,9 @@ async def update_product(
     session: Session = Depends(get_db_session),
     x_user_id: str | None = Header(default=None),
 ) -> dict[str, object]:
-    product = update_product_service(session, product_id, require_user_id(x_user_id), payload)
+    product = update_product_service(
+        session, product_id, require_user_id(x_user_id), payload
+    )
     return {"data": to_product_response(product)}
 
 
@@ -152,6 +171,13 @@ async def list_orders(
     x_user_id: str | None = Header(default=None),
 ) -> dict[str, object]:
     if not mine:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only vendor order listing is supported")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only vendor order listing is supported",
+        )
     owner_id = require_user_id(x_user_id)
-    return {"data": [to_order_response(order) for order in list_orders_service(session, owner_id)]}
+    return {
+        "data": [
+            to_order_response(order) for order in list_orders_service(session, owner_id)
+        ]
+    }

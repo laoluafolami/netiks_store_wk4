@@ -11,11 +11,17 @@ class Category(Base):
     __tablename__ = "categories"
     __table_args__ = {"schema": "catalog"}
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
     name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
-    slug: Mapped[str] = mapped_column(String(140), nullable=False, unique=True, index=True)
+    slug: Mapped[str] = mapped_column(
+        String(140), nullable=False, unique=True, index=True
+    )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -29,7 +35,9 @@ class Product(Base):
     __tablename__ = "products"
     __table_args__ = {"schema": "catalog"}
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
     store_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     owner_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     category_id: Mapped[str] = mapped_column(
@@ -39,7 +47,9 @@ class Product(Base):
         index=True,
     )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
-    slug: Mapped[str] = mapped_column(String(180), nullable=False, unique=True, index=True)
+    slug: Mapped[str] = mapped_column(
+        String(180), nullable=False, unique=True, index=True
+    )
     description: Mapped[str] = mapped_column(Text, nullable=False)
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
@@ -48,7 +58,9 @@ class Product(Base):
     sku: Mapped[str] = mapped_column(String(80), nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="draft")
     featured_image_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -64,7 +76,9 @@ class Order(Base):
     __tablename__ = "orders"
     __table_args__ = {"schema": "catalog"}
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
     product_id: Mapped[str] = mapped_column(
         String(36),
         ForeignKey("catalog.products.id", ondelete="RESTRICT"),
@@ -80,9 +94,15 @@ class Order(Base):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     unit_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     total_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
-    payment_method: Mapped[str] = mapped_column(String(40), nullable=False, default="demo-card")
-    payment_reference: Mapped[str] = mapped_column(String(80), nullable=False, unique=True, index=True)
+    payment_method: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="demo-card"
+    )
+    payment_reference: Mapped[str] = mapped_column(
+        String(80), nullable=False, unique=True, index=True
+    )
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="paid")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     product: Mapped[Product] = relationship(back_populates="orders")

@@ -49,7 +49,9 @@ async def list_products(request: Request) -> dict:
         headers["x-user-id"] = user["id"]
         query = f"?{urlencode({'mine': 'true'})}"
     async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(f"{settings.catalog_service_url}/products{query}", headers=headers)
+        response = await client.get(
+            f"{settings.catalog_service_url}/products{query}", headers=headers
+        )
     if response.is_error:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     return _proxy_json_response(response)
@@ -78,7 +80,9 @@ async def get_product(slug: str, request: Request) -> dict:
         user = await extract_user_context_from_request(request)
         headers["x-user-id"] = user["id"]
     async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(f"{settings.catalog_service_url}/products/{slug}", headers=headers)
+        response = await client.get(
+            f"{settings.catalog_service_url}/products/{slug}", headers=headers
+        )
     if response.is_error:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     return _proxy_json_response(response)
@@ -116,7 +120,9 @@ async def checkout_product(request: Request) -> dict:
 async def list_orders(request: Request) -> dict:
     mine = request.query_params.get("mine")
     if mine != "true":
-        raise HTTPException(status_code=400, detail="Only vendor order listing is supported")
+        raise HTTPException(
+            status_code=400, detail="Only vendor order listing is supported"
+        )
 
     user = await extract_user_context_from_request(request)
     async with httpx.AsyncClient(timeout=10.0) as client:

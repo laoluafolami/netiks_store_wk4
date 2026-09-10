@@ -17,7 +17,9 @@ def ensure_upload_dir() -> Path:
 
 async def save_upload(file: UploadFile) -> dict[str, object]:
     if not file.filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Filename is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Filename is required"
+        )
 
     content_type = file.content_type or "application/octet-stream"
     if content_type not in allowed_content_types:
@@ -28,7 +30,10 @@ async def save_upload(file: UploadFile) -> dict[str, object]:
 
     content = await file.read()
     if len(content) > settings.max_upload_bytes:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File too large")
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File too large",
+        )
 
     upload_dir = ensure_upload_dir()
     suffix = Path(file.filename).suffix.lower() or ".bin"
@@ -64,5 +69,7 @@ def list_uploads() -> list[dict[str, object]]:
 def resolve_upload(file_id: str) -> Path:
     path = ensure_upload_dir() / file_id
     if not path.exists() or not path.is_file():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
+        )
     return path

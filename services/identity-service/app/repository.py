@@ -63,11 +63,15 @@ def get_auth_session_by_refresh_token_hash(
     session: Session,
     refresh_token_hash: str,
 ) -> AuthSession | None:
-    statement = select(AuthSession).where(AuthSession.refresh_token_hash == refresh_token_hash)
+    statement = select(AuthSession).where(
+        AuthSession.refresh_token_hash == refresh_token_hash
+    )
     return session.execute(statement).scalar_one_or_none()
 
 
-def revoke_auth_session(session: Session, auth_session: AuthSession, revoked_at: datetime) -> AuthSession:
+def revoke_auth_session(
+    session: Session, auth_session: AuthSession, revoked_at: datetime
+) -> AuthSession:
     auth_session.revoked_at = revoked_at
     auth_session.last_used_at = revoked_at
     session.add(auth_session)

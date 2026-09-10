@@ -17,7 +17,9 @@ router = APIRouter(tags=["stores"])
 
 def require_user_id(x_user_id: str | None) -> str:
     if not x_user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing user context")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing user context"
+        )
     return x_user_id
 
 
@@ -27,7 +29,9 @@ def to_store_response(store) -> dict[str, str | None]:
 
 @router.get("/stores")
 async def list_stores(session: Session = Depends(get_db_session)) -> dict[str, object]:
-    return {"data": [to_store_response(store) for store in list_stores_service(session)]}
+    return {
+        "data": [to_store_response(store) for store in list_stores_service(session)]
+    }
 
 
 @router.post("/stores", status_code=status.HTTP_201_CREATED)
@@ -41,7 +45,9 @@ async def create_store(
 
 
 @router.get("/stores/{slug}")
-async def get_store(slug: str, session: Session = Depends(get_db_session)) -> dict[str, object]:
+async def get_store(
+    slug: str, session: Session = Depends(get_db_session)
+) -> dict[str, object]:
     return {"data": to_store_response(get_store_by_slug_service(session, slug))}
 
 
@@ -50,11 +56,17 @@ async def get_my_store(
     session: Session = Depends(get_db_session),
     x_user_id: str | None = Header(default=None),
 ) -> dict[str, object]:
-    return {"data": to_store_response(get_store_by_owner_service(session, require_user_id(x_user_id)))}
+    return {
+        "data": to_store_response(
+            get_store_by_owner_service(session, require_user_id(x_user_id))
+        )
+    }
 
 
 @router.get("/internal/stores/{store_id}")
-async def get_store_by_id_internal(store_id: str, session: Session = Depends(get_db_session)) -> dict[str, object]:
+async def get_store_by_id_internal(
+    store_id: str, session: Session = Depends(get_db_session)
+) -> dict[str, object]:
     return {"data": to_store_response(get_store_by_id_service(session, store_id))}
 
 

@@ -16,7 +16,9 @@ def _proxy_json_response(response: httpx.Response) -> JSONResponse:
 async def register(request: Request) -> dict:
     payload = await request.json()
     async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.post(f"{settings.identity_service_url}/auth/register", json=payload)
+        response = await client.post(
+            f"{settings.identity_service_url}/auth/register", json=payload
+        )
 
     if response.is_error:
         raise HTTPException(status_code=response.status_code, detail=response.text)
@@ -28,7 +30,9 @@ async def register(request: Request) -> dict:
 async def login(request: Request) -> dict:
     payload = await request.json()
     async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.post(f"{settings.identity_service_url}/auth/login", json=payload)
+        response = await client.post(
+            f"{settings.identity_service_url}/auth/login", json=payload
+        )
 
     if response.is_error:
         raise HTTPException(status_code=response.status_code, detail=response.text)
@@ -40,7 +44,9 @@ async def login(request: Request) -> dict:
 async def refresh(request: Request) -> dict:
     payload = await request.json()
     async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.post(f"{settings.identity_service_url}/auth/refresh", json=payload)
+        response = await client.post(
+            f"{settings.identity_service_url}/auth/refresh", json=payload
+        )
 
     if response.is_error:
         raise HTTPException(status_code=response.status_code, detail=response.text)

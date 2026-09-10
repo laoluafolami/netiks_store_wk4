@@ -20,4 +20,3 @@ async def list_services() -> dict[str, object]:
             ],
         }
     }
-
