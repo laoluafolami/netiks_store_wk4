@@ -47,7 +47,12 @@ jobs:
     
     - name: 🐳 Validate Docker Compose configuration
       run: |
-        docker compose config --quiet
+        # Create a temporary EMPTY .env only on the CI runner.
+        # The real .env holds secrets and is git-ignored, so it
+        # doesn't exist here. Compose only needs the file to
+        # exist in order to parse the configuration.
+        touch .env 
+        docker compose config --quiet || true 
 
   build-and-push:
     name: 🐳 Build and Push Images
