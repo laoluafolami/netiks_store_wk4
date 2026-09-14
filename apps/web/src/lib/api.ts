@@ -56,6 +56,14 @@ export async function fetchVendorOrders(token: string) {
   });
 }
 
+// Runtime-configurable media base URL (12-factor style).
+// Read from the container environment at request time so the SAME
+// Docker image works on localhost, the Azure VM, or any future host.
+const mediaBaseUrl =
+  process.env.MEDIA_PUBLIC_URL ??
+  process.env.NEXT_PUBLIC_MEDIA_URL ??
+  "http://127.0.0.1:8004";
+
 export function resolveMediaUrl(path: string | null) {
   if (!path) {
     return null;
@@ -65,5 +73,5 @@ export function resolveMediaUrl(path: string | null) {
     return path;
   }
 
-  return `http://127.0.0.1:8004${path}`;
+  return `${mediaBaseUrl}${path}`;
 }
