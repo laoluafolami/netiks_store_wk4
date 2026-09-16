@@ -18,7 +18,7 @@ export default async function Home() {
       <div className="mx-auto max-w-[84rem] rounded-[2.2rem] bg-[var(--surface)] px-6 py-6 shadow-[0_30px_90px_rgba(88,71,14,0.08)] md:px-10 md:py-8 xl:px-14 xl:py-10">
         <header className="flex flex-col gap-6 border-b border-[var(--line)] pb-8 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#907314]">Netiks Store</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#907314]">Welcome to Netiks Store v1.2.0</p>
             <h1 className="mt-3 max-w-3xl text-[2.2rem] font-semibold leading-[1.05] tracking-[-0.05em] text-[#141413] md:text-[3.4rem]">
               Discover thoughtful products for work, travel, and everyday carry.
             </h1>
