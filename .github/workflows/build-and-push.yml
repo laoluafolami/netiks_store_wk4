@@ -158,7 +158,7 @@ jobs:
             cd ~/netiks_store
             VERSION="${{ inputs.version || github.ref_name }}"
             echo "🚀 Deploying version: $VERSION"
-            git fetch --tags origin
+            git fetch --tags --force origin
             git checkout --force "$VERSION"
             docker compose \
               -f docker-compose.yml \
