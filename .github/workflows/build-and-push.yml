@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tag to deploy, e.g. v1.1.0"
+        required: true
+        type: string
 
 jobs:
   validate:
@@ -25,7 +31,7 @@ jobs:
           echo "Running Python linting..."
           black --check apps/ services/ || true
           flake8 apps/ services/ || true
-      - name: ⚛️ Set up Node.js 20
+      - name: ️ Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -78,8 +84,6 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # OIDC step 1: GitHub mints a short-lived token; Entra validates it
-      # against your federated credential and issues an Entra access token.
       - name: 🔐 Azure Login (OIDC)
         uses: azure/login@v2
         with:
@@ -87,8 +91,6 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      # OIDC step 2: reuse that Entra session (NO password anywhere) to obtain
-      # a short-lived ACR docker token for the runner.
       - name: 🐳 Login to ACR via OIDC (no stored secret)
         run: az acr login --name netiksstoreregistry
 
@@ -116,3 +118,36 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+
+  deploy:
+    name: 🚀 Deploy to Production
+    needs: build-and-push
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: 🚀 Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/netiks_store
+            VERSION="${{ inputs.version || github.ref_name }}"
+            echo "🚀 Deploying version: $VERSION"
+            git fetch --tags origin
+            git checkout --force "$VERSION"
+            docker compose \
+              -f docker-compose.yml \
+              -f docker-compose.prod.yml \
+              pull
+            docker compose \
+              -f docker-compose.yml \
+              -f docker-compose.prod.yml \
+              up -d
+            docker compose \
+              -f docker-compose.yml \
+              -f docker-compose.prod.yml \
+              ps
