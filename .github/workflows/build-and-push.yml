@@ -119,21 +119,45 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
-  deploy:
+    deploy:
     name: 🚀 Deploy to Production
     needs: build-and-push
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: read
+      id-token: write   # REQUIRED: allows this job to mint an OIDC token for Azure
     steps:
+      - name: 🔐 Azure Login (OIDC for ACR Token)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 🎟️ Get Short-Lived ACR Token
+        id: get_acr_token
+        run: |
+          TOKEN=$(az acr login --name netiksstoreregistry --expose-token --query accessToken -o tsv)
+          echo "::add-mask::$TOKEN"
+          echo "ACR_TOKEN=$TOKEN" >> $GITHUB_ENV
+
       - name: 🚀 Deploy over SSH
         uses: appleboy/ssh-action@v1
+        env:
+          ACR_TOKEN: ${{ env.ACR_TOKEN }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: ACR_TOKEN
           script: |
             set -e
+            
+            # Log in to ACR on the VM using the short-lived token
+            echo "$ACR_TOKEN" | docker login netiksstoreregistry.azurecr.io -u 00000000-0000-0000-0000-000000000000 --password-stdin
+            
             cd ~/netiks_store
             VERSION="${{ inputs.version || github.ref_name }}"
             echo "🚀 Deploying version: $VERSION"
