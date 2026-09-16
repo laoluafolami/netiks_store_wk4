@@ -5,29 +5,29 @@ version: '3.8'
 
 services:
   web:
-    image: netiksstoreregistry.azurecr.io/web:v1.1.1
+    image: netiksstoreregistry.azurecr.io/web:v1.2.0
     pull_policy: always
   
   gateway:
-    image: netiksstoreregistry.azurecr.io/gateway:v1.1.1
+    image: netiksstoreregistry.azurecr.io/gateway:v1.2.0
     pull_policy: always
   
   identity-service:
-    image: netiksstoreregistry.azurecr.io/identity-service:v1.1.1
+    image: netiksstoreregistry.azurecr.io/identity-service:v1.2.0
     pull_policy: always
   
   vendor-service:
-    image: netiksstoreregistry.azurecr.io/vendor-service:v1.1.1
+    image: netiksstoreregistry.azurecr.io/vendor-service:v1.2.0
     pull_policy: always
   
   catalog-service:
-    image: netiksstoreregistry.azurecr.io/catalog-service:v1.1.1
+    image: netiksstoreregistry.azurecr.io/catalog-service:v1.2.0
     pull_policy: always
   
   media-service:
-    image: netiksstoreregistry.azurecr.io/media-service:v1.1.1
+    image: netiksstoreregistry.azurecr.io/media-service:v1.2.0
     pull_policy: always
   
   admin-service:
-    image: netiksstoreregistry.azurecr.io/admin-service:v1.1.1
+    image: netiksstoreregistry.azurecr.io/admin-service:v1.2.0
     pull_policy: always
