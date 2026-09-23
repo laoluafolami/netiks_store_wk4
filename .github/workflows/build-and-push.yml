@@ -178,40 +178,40 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           envs: COMMIT_SHA
-             script: |
-              set -e
+            script: |
+            set -e
+            
+            echo "🔐 Authenticating to Azure using VM Managed Identity..."
+            az login --identity
+            
+            echo "🐳 Logging into ACR..."
+            az acr login --name netiksstoreregistry
+            
+            cd /home/deploy/netiks_store-staging
+            
+            echo "📥 Fetching latest main branch..."
+            git fetch origin main
+            git checkout --force main
+            git reset --hard origin/main
+            
+            echo "🏷️ Getting the short SHA from the current Git commit..."
+            export IMAGE_TAG="$(git rev-parse HEAD | cut -c1-7)"
+            export REGISTRY="netiksstoreregistry.azurecr.io"
+            echo "Using IMAGE_TAG=$IMAGE_TAG"
+            
+            echo "📦 Pulling SHA-tagged images..."
+            docker compose \
+              -p netiks_staging \
+              -f docker-compose.yml \
+              -f docker-compose.staging.yml \
+              pull
               
-              echo "🔐 Authenticating to Azure using VM Managed Identity..."
-              az login --identity
+            echo "🚀 Starting staging services..."
+            docker compose \
+              -p netiks_staging \
+              -f docker-compose.yml \
+              -f docker-compose.staging.yml \
+              up -d
               
-              echo "🐳 Logging into ACR..."
-              az acr login --name netiksstoreregistry
-              
-              cd /home/deploy/netiks_store-staging
-              
-              echo "📥 Fetching latest main branch..."
-              git fetch origin main
-              git checkout --force main
-              git reset --hard origin/main
-              
-              echo "🏷️ Getting the short SHA from the current Git commit..."
-              export IMAGE_TAG="$(git rev-parse HEAD | cut -c1-7)"
-              export REGISTRY="netiksstoreregistry.azurecr.io"
-              echo "Using IMAGE_TAG=$IMAGE_TAG"
-              
-              echo "📦 Pulling SHA-tagged images..."
-              docker compose \
-                -p netiks_staging \
-                -f docker-compose.yml \
-                -f docker-compose.staging.yml \
-                pull
-                
-              echo "🚀 Starting staging services..."
-              docker compose \
-                -p netiks_staging \
-                -f docker-compose.yml \
-                -f docker-compose.staging.yml \
-                up -d
-                
-              echo "✅ Staging deployment complete!"
-              docker compose -p netiks_staging ps
+            echo "✅ Staging deployment complete!"
+            docker compose -p netiks_staging ps
