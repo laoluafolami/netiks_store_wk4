@@ -992,10 +992,6 @@ grep JWT_SECRET /home/deploy/netiks_store-staging/.env | cut -c1-40
 grep JWT_SECRET /home/deploy/netiks_store/.env | cut -c1-40
 ```
 
-**These should be DIFFERENT!**
-
-**[PLACEHOLDER: Screenshot showing different JWT secrets for staging and production]**
-
 ---
 
 ## Step 7: Commit Configuration Files to Git
@@ -1030,18 +1026,9 @@ git push origin main
 ```
 
 **Expected Output:**
-```
-Enumerating objects: 5, done.
-Counting objects: 100% (5/5), done.
-Delta compression using up to 8 threads
-Compressing objects: 100% (3/3), done.
-Writing objects: 100% (3/3), 456 bytes | 456.00 KiB/s, done.
-Total 3 (delta 2), reused 0 (delta 0), pack-reused 0
-To github.com:your-org/netiks_store.git
-   abc1234..def5678  main -> main
-```
+<img width="693" height="333" alt="image" src="https://github.com/user-attachments/assets/ff61c00c-262a-4fd0-a29c-91f0d951f9c7" />
 
-**[PLACEHOLDER: Screenshot of git commit and push output]**
+**PLACEHOLDER: Screenshot of git commit and push output**
 
 ---
 
@@ -1164,7 +1151,12 @@ Scroll to the end of the file (after the `deploy` job) and add this new job:
 
 Press `Ctrl+S` to save.
 
-**[PLACEHOLDER: Screenshot of updated build-and-push.yml showing deploy-staging job]**
+<img width="762" height="847" alt="image" src="https://github.com/user-attachments/assets/a22f6ab0-3c2a-4bb9-8349-b7311d54ff1d" />
+<img width="571" height="72" alt="image" src="https://github.com/user-attachments/assets/dc139c04-8a83-4063-b3bd-46a1ce84b24e" />
+<img width="699" height="838" alt="image" src="https://github.com/user-attachments/assets/31a410b6-9fb3-4939-a1ae-57c31dc5b650" />
+<img width="607" height="263" alt="image" src="https://github.com/user-attachments/assets/c37e9f3b-3095-443e-af38-2897cea63f44" />
+
+**PLACEHOLDER: Screenshot of updated build-and-push.yml showing deploy-staging jobs**
 
 ---
 
@@ -1223,8 +1215,9 @@ You should see these jobs running in sequence:
 2. 🐳 Build and Push Images (7 services in parallel)
 3. 🎭 Deploy to Staging (NEW!)
 ```
+<img width="1664" height="700" alt="image" src="https://github.com/user-attachments/assets/550b4d25-4372-42cf-9ccb-cbb3302c03a7" />
 
-**[PLACEHOLDER: Screenshot of GitHub Actions showing deploy-staging job running]**
+**Screenshot of GitHub Actions showing deploy-staging job running**
 
 ---
 
@@ -1413,7 +1406,9 @@ Create a GitHub Environment for staging with deployment credentials.
 2. Click **Settings** (top navigation bar)
 3. Click **Environments** (left sidebar)
 
-**[PLACEHOLDER: Screenshot of GitHub repository Settings page with Environments highlighted]**
+<img width="1648" height="614" alt="image" src="https://github.com/user-attachments/assets/f84417af-3190-4329-8a36-958345720ab0" />
+
+**Screenshot of GitHub repository Settings page with Environments highlighted]**
 
 ---
 
@@ -1423,7 +1418,9 @@ Create a GitHub Environment for staging with deployment credentials.
 2. Enter name: `staging`
 3. Click **Configure environment**
 
-**[PLACEHOLDER: Screenshot of "New environment" dialog with "staging" entered]**
+<img width="1311" height="478" alt="image" src="https://github.com/user-attachments/assets/2356490e-88d8-4ac3-bc74-df45143b5f1a" />
+
+**Screenshot of "New environment" dialog with "staging" entered**
 
 ---
 
@@ -1446,7 +1443,9 @@ Staging should deploy automatically without approval.
 - No real users affected
 - Encourages frequent testing
 
-**[PLACEHOLDER: Screenshot showing staging environment with NO required reviewers configured]**
+<img width="1646" height="637" alt="image" src="https://github.com/user-attachments/assets/388b0659-6a2f-40a2-a4a1-ebc7bf8063fd" />
+
+**Screenshot showing staging environment with NO required reviewers configured]**
 
 ---
 
@@ -1498,7 +1497,9 @@ The "Environment secrets" section should now show:
 - `DEPLOY_HOST`
 - `DEPLOY_USER`
 
-**[PLACEHOLDER: Screenshot of staging environment showing three secret NAMES only (not values)]**
+<img width="1353" height="403" alt="image" src="https://github.com/user-attachments/assets/0f6e8f81-3c91-4074-aed4-a75b66fd92d3" />
+
+**Screenshot of staging environment showing three secret NAMES only (not values)]**
 
 ---
 
