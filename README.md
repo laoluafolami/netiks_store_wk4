@@ -1,3 +1,3978 @@
+# 🚀 Netiks Store - Week 6 Lab: Staging Environment Implementation Guide
+## Complete Step-by-Step Implementation with Pre-Production Deployment
+
+**Lab Duration:** 1 week  
+**Submission Deadline:** Friday, 25 September, 5:00 PM  
+**Prerequisite:** Week 5 Lab (Production deployment pipeline working)
+
+---
+
+## 📋 Executive Summary
+
+**Week 5 Limitation:** Version tags deploy directly to production after approval, without testing the changes in a production-like environment first.
+
+**Week 6 Solution:** Introduce a **staging environment** that automatically receives every commit to `main`, allowing you to test changes before creating a production release tag.
+
+**Final Workflow:**
+```
+Developer pushes to main
+    ↓
+CI builds and pushes SHA-tagged images
+    ↓
+Staging automatically deploys SHA images (no approval)
+    ↓
+Team tests changes in staging
+    ↓
+Developer creates version tag (e.g., v1.3.0)
+    ↓
+Production requires approval
+    ↓
+Production deploys after approval
+```
+
+**Key Benefits:**
+- ✅ Test every change before production
+- ✅ Catch bugs in staging, not production
+- ✅ Staging and production run side-by-side on same VM
+- ✅ Complete isolation between environments
+
+---
+
+# PART 1: Understand the Basics
+
+## Question 1.1: Why is a successful CI build not enough to know that an application is ready for production?
+
+### Answer
+
+A successful CI build only proves that:
+- ✅ Code compiles without errors
+- ✅ Linters pass (code style checks)
+- ✅ Docker images can be built
+- ✅ Static analysis succeeds
+
+**But it does NOT prove:**
+
+**1. Runtime Behavior**
+- ❌ Application actually runs without crashing
+- ❌ Services can communicate with each other
+- ❌ Database connections work
+- ❌ API endpoints respond correctly
+- ❌ Frontend renders properly
+
+**Example:**
+```python
+# This builds successfully:
+def get_user(user_id):
+    return database.query(f"SELECT * FROM users WHERE id = {user_id}")  # SQL injection!
+
+# But causes runtime issues:
+# - Security vulnerability
+# - Works with test data
+# - Fails with production-scale data
+```
+
+**2. Integration Issues**
+- ❌ Services might fail to connect in real network
+- ❌ Database migrations might fail on actual data
+- ❌ Environment variables might be misconfigured
+- ❌ Volumes and mounts might not exist
+
+**Example:**
+```yaml
+# docker-compose.yml
+services:
+  api:
+    environment:
+      DATABASE_URL: ${DATABASE_URL}  # Missing in .env!
+
+# Build succeeds, but runtime fails:
+# "Error: DATABASE_URL not set"
+```
+
+**3. Performance Problems**
+- ❌ Application might be too slow with real data
+- ❌ Memory leaks only appear after hours of running
+- ❌ Database queries might be inefficient
+- ❌ API might timeout under load
+
+**4. User Experience Issues**
+- ❌ UI might have broken links
+- ❌ Forms might not submit
+- ❌ Images might not load
+- ❌ Mobile layout might be broken
+
+**5. Business Logic Errors**
+- ❌ Calculations might be wrong
+- ❌ Permissions might allow unauthorized access
+- ❌ Workflows might skip critical steps
+
+**Real-World Scenario:**
+
+```
+CI Build: ✅ Passed
+    ├─ Code compiles
+    ├─ Linting passes
+    ├─ Docker build succeeds
+    └─ "Ship it!"
+
+Deploy to Production:
+    ├─ App crashes on startup (missing env var)
+    ├─ Database connection timeout
+    ├─ Frontend shows blank page (API URL wrong)
+    ├─ Users cannot login (JWT secret mismatch)
+    └─ ❌ Production down for 2 hours
+
+vs.
+
+CI Build: ✅ Passed
+
+Deploy to Staging:
+    ├─ App crashes (missing env var)
+    ├─ Fix: Add env var to .env.staging
+    ├─ Redeploy staging: ✅ Works
+    └─ Now safe to deploy to production
+
+Deploy to Production: ✅ Works
+```
+
+**Summary:**
+
+| CI Build Tests | Staging Tests |
+|----------------|---------------|
+| Code compiles | App actually runs |
+| Syntax correct | Services communicate |
+| Linting passes | Database connects |
+| Images build | API endpoints work |
+| | Frontend renders |
+| | User workflows complete |
+| | Performance acceptable |
+
+**Conclusion:**
+> A successful CI build proves the code is syntactically correct. Staging deployment proves the application actually works in a production-like environment.
+
+---
+
+## Question 1.2: Why should staging deploy the exact SHA-tagged image produced by the build job instead of building another image?
+
+### Answer
+
+**The Problem with Building Again:**
+
+If staging builds its own image instead of using the CI-built image:
+
+**1. Image Drift (Different Images)**
+
+```
+CI Build Job:
+    ├─ Builds image at 1:00 PM
+    ├─ Base image: node:20.5.0
+    ├─ Dependencies: express@4.18.2
+    ├─ Image SHA: abc123
+    └─ Pushes to registry
+
+Staging builds separately at 1:05 PM:
+    ├─ Base image: node:20.5.1 (updated!)
+    ├─ Dependencies: express@4.18.3 (new version!)
+    ├─ Image SHA: def456 (completely different!)
+    └─ ❌ Not the same image!
+
+Result:
+    Staging tests: def456 (different image)
+    Production gets: abc123 (original image)
+    ❌ You tested the WRONG thing!
+```
+
+**2. Time-Based Inconsistencies**
+
+```
+Dockerfile:
+    FROM node:20-alpine  # No specific version
+
+11:00 AM - CI builds:
+    └─ Uses node:20.5.0 (latest at that time)
+
+11:05 AM - Staging rebuilds:
+    └─ Uses node:20.5.1 (new version released!)
+
+Result: Different base images = untested configuration in staging
+```
+
+**3. External Dependency Changes**
+
+```
+Dockerfile:
+    RUN pip install fastapi  # No version pinned
+
+CI Build:
+    └─ Installs fastapi 0.104.0
+
+Staging Rebuild (5 minutes later):
+    └─ Installs fastapi 0.104.1 (just released with bug!)
+
+Result:
+    Staging: Tests with buggy fastapi 0.104.1
+    Production: Gets fastapi 0.104.0
+    ❌ Bug might not be caught in staging
+```
+
+**4. Build Context Differences**
+
+```
+CI build:
+    ├─ COPY package.json
+    ├─ COPY src/
+    ├─ Commit: abc123
+    └─ Image built from exact commit
+
+Staging rebuild:
+    ├─ main branch has moved forward
+    ├─ New commits added
+    ├─ Commit: def456
+    └─ ❌ Built from different code!
+
+Result: Staging tests newer code than what was built
+```
+
+**5. Build Timing Issues**
+
+```
+CI build at 1:00 PM:
+    ├─ npm install → downloads dependencies
+    ├─ All package versions locked
+    ├─ Image: abc123
+    └─ Pushed to registry
+
+Staging rebuild at 1:05 PM:
+    ├─ npm install → one package updated
+    ├─ New package version introduced
+    ├─ Image: def456
+    └─ ❌ Different packages!
+
+Result: Staging has different dependencies
+```
+
+**6. Wasted Resources**
+
+```
+Build once (CI):
+    ├─ Duration: 5 minutes
+    ├─ Resources: 1 build
+    └─ Cost: $0.01
+
+Build twice (CI + Staging):
+    ├─ Duration: 10 minutes total
+    ├─ Resources: 2 builds
+    ├─ Cost: $0.02
+    └─ ❌ Doubles build time and cost
+```
+
+**The Correct Approach: Use SHA-Tagged Images**
+
+```
+1:00 PM - Developer pushes commit abc123 to main
+
+1:01 PM - CI build-and-push job:
+    ├─ Checks out abc123
+    ├─ Builds 7 images
+    ├─ Tags with SHA: netiksstoreregistry.azurecr.io/web:abc123
+    ├─ Pushes to registry
+    └─ ✅ Images ready
+
+1:03 PM - Staging deployment:
+    ├─ Uses IMAGE_TAG=abc123
+    ├─ Pulls: netiksstoreregistry.azurecr.io/web:abc123
+    ├─ Same exact image CI built
+    └─ ✅ Tests the EXACT image
+
+1:10 PM - Create production tag v1.3.0 (points to abc123)
+
+1:11 PM - Production deployment:
+    ├─ Uses version v1.3.0 (same as abc123)
+    ├─ Pulls: netiksstoreregistry.azurecr.io/web:v1.3.0
+    ├─ Same image staging tested
+    └─ ✅ Deploys what was tested
+```
+
+**Benefits of SHA-Tagged Images:**
+
+| Factor | Build Again | Use SHA Image |
+|--------|-------------|---------------|
+| **Same image?** | ❌ No (different build) | ✅ Yes (exact same) |
+| **Base image version** | ❌ Might differ | ✅ Identical |
+| **Dependencies** | ❌ Might differ | ✅ Identical |
+| **Build time** | ❌ Doubles | ✅ Single build |
+| **Cost** | ❌ 2x | ✅ 1x |
+| **Test confidence** | ❌ Low (tested different thing) | ✅ High (tested exact thing) |
+| **Traceability** | ❌ Hard | ✅ Easy (SHA links to commit) |
+
+**Image Flow:**
+
+```
+Commit abc123
+    ↓
+CI builds image:abc123
+    ↓
+Registry stores image:abc123
+    ↓
+Staging pulls image:abc123 (exact same)
+    ↓
+Team tests image:abc123
+    ↓
+Tag v1.3.0 created for commit abc123
+    ↓
+Production pulls image:abc123 (via v1.3.0 tag)
+    ↓
+✅ Production runs EXACTLY what staging tested
+```
+
+**Summary:**
+> Staging must use SHA-tagged images from CI to ensure you're testing the EXACT artifact that will go to production. Rebuilding creates a different image and undermines the entire purpose of staging.
+
+---
+
+## Question 1.3: Why should staging deploy automatically while production still requires approval?
+
+### Answer
+
+**Staging and production have different purposes and risk profiles.**
+
+### Staging Environment Characteristics
+
+**Purpose:** Fast feedback and experimentation
+- ✅ Test every change immediately
+- ✅ Catch bugs early
+- ✅ Validate features quickly
+- ✅ Experiment with code
+
+**Risk Profile:** Low
+- No real users affected
+- No real data at risk
+- Can break without consequences
+- Easy to reset/redeploy
+
+**Usage Pattern:**
+```
+Developer commits fix → Staging auto-deploys (5 min)
+    ↓
+Developer tests immediately
+    ↓
+Bug found? Fix and push again → Staging auto-deploys
+    ↓
+Iterate quickly until satisfied
+```
+
+**Why Automatic:**
+1. **Fast Feedback Loop**
+   ```
+   Without auto-deploy:
+   Commit → Wait for approval → Test (slow)
+   
+   With auto-deploy:
+   Commit → Test immediately (fast)
+   ```
+
+2. **Encourages Testing**
+   ```
+   Manual approval required:
+       └─ Developers skip staging ("too slow")
+   
+   Automatic deployment:
+       └─ Developers always test in staging
+   ```
+
+3. **Development Efficiency**
+   ```
+   9:00 AM - Push fix to staging
+   9:01 AM - Staging deploys automatically
+   9:02 AM - Test and verify
+   9:03 AM - Found another issue
+   9:04 AM - Push another fix
+   9:05 AM - Staging deploys automatically
+   9:06 AM - Test and verify again
+   ✅ Fast iteration
+   ```
+
+---
+
+### Production Environment Characteristics
+
+**Purpose:** Serve real users with stability
+- ✅ Must be stable and tested
+- ✅ Changes must be deliberate
+- ✅ Downtime affects business
+- ✅ Data integrity critical
+
+**Risk Profile:** High
+- Real users affected immediately
+- Real business data at risk
+- Bugs cause revenue loss
+- Downtime has consequences
+
+**Usage Pattern:**
+```
+Staging tested thoroughly → Create production tag
+    ↓
+Wait for approval (human reviews)
+    ↓
+Manager approves → Production deploys
+    ↓
+Monitor carefully for issues
+```
+
+**Why Manual Approval:**
+1. **Human Oversight**
+   ```
+   Reviewer checks:
+   - Is staging green?
+   - Are there ongoing incidents?
+   - Is this the right time to deploy?
+   - Have we tested enough?
+   - Are on-call engineers available?
+   ```
+
+2. **Timing Control**
+   ```
+   Without approval:
+   3:00 PM Friday - Auto-deploys to production
+   3:05 PM - Critical bug discovered
+   3:06 PM - Weekend starts, team gone
+   ❌ Bad timing
+
+   With approval:
+   3:00 PM Friday - Waits for approval
+   Manager: "Let's wait until Monday morning"
+   ✅ Smart timing
+   ```
+
+3. **Incident Prevention**
+   ```
+   Without approval:
+   Deploy during active incident
+   Makes incident worse
+   ❌ Chaos
+
+   With approval:
+   Manager sees ongoing incident
+   Blocks deployment until resolved
+   ✅ Safe
+   ```
+
+4. **Accountability**
+   ```
+   Auto-deploy:
+   - No clear decision maker
+   - "The pipeline did it"
+   - Hard to audit
+
+   Manual approval:
+   - Clear decision maker
+   - "Manager X approved at Y time"
+   - Easy audit trail
+   ```
+
+---
+
+### Side-by-Side Comparison
+
+| Factor | Staging | Production |
+|--------|---------|-----------|
+| **Users Affected** | 0 (internal team) | Thousands (customers) |
+| **Risk** | Low | High |
+| **Data** | Test data | Real business data |
+| **Downtime Impact** | None | Revenue loss |
+| **Deploy Frequency** | Many times/day | Few times/week |
+| **Speed Priority** | Fast feedback | Stability |
+| **Approval Needed** | ❌ No | ✅ Yes |
+| **Can Break** | ✅ Yes (that's the point!) | ❌ No |
+
+---
+
+### Real-World Scenario
+
+**Staging (Automatic):**
+```
+9:00 AM - Developer pushes to main
+9:01 AM - Staging auto-deploys
+9:02 AM - Developer tests
+9:03 AM - "Oops, I broke the login!"
+9:04 AM - Pushes fix
+9:05 AM - Staging auto-deploys fixed version
+9:06 AM - Developer tests: "Works now!"
+✅ Fast iteration, no consequences
+```
+
+**Production (Manual Approval):**
+```
+4:00 PM - Staging tested all day, everything works
+4:01 PM - Create production tag v1.3.0
+4:02 PM - Workflow waits for approval
+4:03 PM - Manager reviews:
+           - Checks staging status: ✅ Green
+           - Checks team availability: ✅ Engineers online
+           - Checks monitoring: ✅ No incidents
+           - Checks time: ✅ 4 PM, not Friday night
+4:04 PM - Manager approves
+4:05 PM - Production deploys
+4:06 PM - Team monitors closely
+✅ Deliberate, controlled change
+```
+
+---
+
+### What Would Go Wrong With Different Configurations?
+
+**Scenario 1: Staging with Manual Approval (BAD)**
+```
+Developer commits fix
+    ↓
+Staging waits for approval
+    ↓
+Developer waits 30 minutes
+    ↓
+Approval granted
+    ↓
+Staging deploys
+    ↓
+Developer tests: "It's broken!"
+    ↓
+Fix and commit
+    ↓
+Wait another 30 minutes for approval
+    ↓
+❌ Development slows to a crawl
+```
+
+**Scenario 2: Production with Auto-Deploy (DISASTER)**
+```
+Developer commits "quick fix" at 5 PM Friday
+    ↓
+Production auto-deploys immediately
+    ↓
+Critical bug discovered
+    ↓
+Entire site down
+    ↓
+Weekend starts, team unavailable
+    ↓
+❌ Site down for 48 hours
+```
+
+---
+
+### Workflow Comparison
+
+**Correct Configuration:**
+```
+Developer commits to main
+    ↓
+Staging auto-deploys ✅ (fast feedback)
+    ↓
+Test in staging
+    ↓
+Create production tag
+    ↓
+Production waits for approval ✅ (safety)
+    ↓
+Human approves
+    ↓
+Production deploys ✅ (controlled)
+```
+
+**Summary:**
+> Staging deploys automatically for fast iteration and immediate testing. Production requires approval because changes affect real users and need human oversight for timing, safety, and accountability.
+
+---
+
+---
+
+# PART 2: Prepare the Staging Environment
+
+Staging and production will run on the **same VM** but remain completely isolated through:
+- ✅ Separate directories
+- ✅ Separate Docker Compose projects
+- ✅ Separate ports
+- ✅ Separate environment variables
+- ✅ Separate database volumes
+
+---
+
+## Step 1: SSH into Your Azure VM
+
+Open your terminal or PowerShell and connect to your VM:
+
+```bash
+ssh azureuser@<YOUR_VM_PUBLIC_IP>
+```
+
+Replace `<YOUR_VM_PUBLIC_IP>` with your actual VM IP address (e.g., `20.29.81.166`).
+
+**Expected Output:**
+```
+Welcome to Ubuntu 22.04.3 LTS
+Last login: ...
+azureuser@netiks-vm:~$
+```
+<img width="574" height="530" alt="image" src="https://github.com/user-attachments/assets/949143b1-0efa-4bca-9fa3-aecf88e294f1" />
+
+**Screenshot showing successful SSH connection to VM**
+
+---
+
+## Step 2: Create Staging Working Directory
+
+Clone a second copy of your repository for the staging environment.
+
+### Action: Clone Repository for Staging
+
+Execute this command:
+
+```bash
+sudo -u deploy git clone https://github.com/<YOUR_ORG>/netiks_store.git /home/deploy/netiks_store-staging
+```
+
+Replace `<YOUR_ORG>` with your actual GitHub organization or username.
+
+**What this does:**
+- `sudo -u deploy` = Run as the deploy user (not your personal account)
+- `git clone` = Copy the repository
+- `/home/deploy/netiks_store-staging` = Destination directory with `-staging` suffix
+
+**Expected Output:**
+```
+Cloning into '/home/deploy/netiks_store-staging'...
+remote: Enumerating objects: 1234, done.
+remote: Counting objects: 100% (1234/1234), done.
+remote: Compressing objects: 100% (567/567), done.
+Receiving objects: 100% (1234/1234), 2.34 MiB | 5.67 MiB/s, done.
+Resolving deltas: 100% (890/890), done.
+```
+
+### Action: Verify Both Directories Exist
+
+Execute:
+
+```bash
+   sudo -u deploy git clone <repository-url> /home/deploy/netiks_store-staging
+```
+
+**Expected Output:**
+<img width="764" height="173" alt="image" src="https://github.com/user-attachments/assets/8bf8eb50-6626-4dbf-9eef-c89b6fed8042" />
+
+**Screenshot showing both directories listed**
+
+---
+
+## Step 3: Update Base docker-compose.yml for Port Variables
+
+The base `docker-compose.yml` currently has hardcoded ports. You need to make them configurable via environment variables so staging and production can use different ports.
+
+### Action: Open docker-compose.yml on Your Laptop
+
+Open the file in your code editor:
+
+```
+g:\projects\netiks_store_wk4\docker-compose.yml
+```
+
+### Action: Find the `web` Service Ports Section
+
+Locate this section (around line 8):
+
+```yaml
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "${WEB_EXPOSE_PORT:-3001}:3000"
+```
+
+**Current state:** Already has `${WEB_EXPOSE_PORT:-3001}` ✅
+
+### Action: Find the `gateway` Service Ports Section
+
+Locate this section (around line 17):
+
+```yaml
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    env_file:
+      - .env
+    environment:
+      APP_NAME: gateway
+      APP_PORT: 8000
+      # ... other env vars
+    ports:
+      - "8000:8000"
+```
+
+### Action: Replace Gateway Ports with Environment Variable
+
+**Change FROM:**
+```yaml
+    ports:
+      - "8000:8000"
+```
+
+**Change TO:**
+```yaml
+    ports:
+      - "127.0.0.1:${GATEWAY_EXPOSE_PORT:-8000}:8000"
+```
+
+**What this does:**
+- `${GATEWAY_EXPOSE_PORT:-8000}` = Use env var `GATEWAY_EXPOSE_PORT`, default to `8000`
+- `127.0.0.1:` = Bind to localhost only (security best practice)
+- `:8000` = Container internal port (doesn't change)
+
+### Action: Update All Internal Service Ports
+
+Find these services and update their ports:
+
+**identity-service** (around line 36):
+```yaml
+    ports:
+      - "${IDENTITY_EXPOSE_PORT:-8001}:8001"
+```
+
+**vendor-service** (around line 48):
+```yaml
+    ports:
+      - "${VENDOR_EXPOSE_PORT:-8002}:8002"
+```
+
+**catalog-service** (around line 60):
+```yaml
+    ports:
+      - "${CATALOG_EXPOSE_PORT:-8003}:8003"
+```
+
+**media-service** (around line 72):
+```yaml
+    ports:
+      - "${MEDIA_EXPOSE_PORT:-8004}:8004"
+```
+
+**admin-service** (around line 86):
+```yaml
+    ports:
+      - "${ADMIN_EXPOSE_PORT:-8005}:8005"
+```
+
+### Action: Save docker-compose.yml
+
+Press `Ctrl+S` (Windows) or `Cmd+S` (Mac) to save the file.
+
+<img width="721" height="553" alt="image" src="https://github.com/user-attachments/assets/c7328f21-c1ea-4ebf-85ad-813ae8879f7c" />
+<img width="611" height="558" alt="image" src="https://github.com/user-attachments/assets/215a64a9-d40f-4d86-ab1b-38cbdaa93360" />
+<img width="573" height="557" alt="image" src="https://github.com/user-attachments/assets/b0579c29-ab94-4f11-8574-761ba10e4ac1" />
+<img width="584" height="564" alt="image" src="https://github.com/user-attachments/assets/bc69aeda-a11d-468c-b7bf-4298e9ecd0ab" />
+
+**Screenshot of updated docker-compose.yml showing environment variable ports**
+
+---
+
+## Step 4: Create docker-compose.staging.yml
+
+Now create a new file specifically for staging configuration.
+
+### Action: Create New File
+
+In your code editor, create a new file:
+
+```
+g:\projects\netiks_store_wk4\docker-compose.staging.yml
+```
+
+### Action: Copy This Content Into the File
+
+```yaml
+# Staging environment configuration
+# Usage: docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+
+version: '3.8'
+
+services:
+  web:
+    image: ${REGISTRY}/web:${IMAGE_TAG}
+    pull_policy: always
+
+  gateway:
+    image: ${REGISTRY}/gateway:${IMAGE_TAG}
+    pull_policy: always
+
+  identity-service:
+    image: ${REGISTRY}/identity-service:${IMAGE_TAG}
+    pull_policy: always
+
+  vendor-service:
+    image: ${REGISTRY}/vendor-service:${IMAGE_TAG}
+    pull_policy: always
+
+  catalog-service:
+    image: ${REGISTRY}/catalog-service:${IMAGE_TAG}
+    pull_policy: always
+
+  media-service:
+    image: ${REGISTRY}/media-service:${IMAGE_TAG}
+    pull_policy: always
+
+  admin-service:
+    image: ${REGISTRY}/admin-service:${IMAGE_TAG}
+    pull_policy: always
+```
+
+**Key points:**
+- `${REGISTRY}` = Your ACR registry URL (e.g., `netiksstoreregistry.azurecr.io`)
+- `${IMAGE_TAG}` = Git commit SHA (set during deployment)
+- `pull_policy: always` = Always pull fresh images
+- No `ports:` section = Uses defaults from base docker-compose.yml
+- No `build:` section = Uses pre-built images from registry
+
+### Action: Save docker-compose.staging.yml
+
+Press `Ctrl+S` to save the file.
+<img width="690" height="669" alt="image" src="https://github.com/user-attachments/assets/d4285123-b847-4bbc-86fc-641456cdd744" />
+
+**Screenshot of docker-compose.staging.yml file in code editor**
+
+---
+
+## Step 5: Create Staging Environment Variables File
+
+Staging needs its own `.env` file with different database credentials, ports, and secrets.
+
+### Action: SSH into VM and Navigate to Staging Directory
+
+```bash
+cd /home/deploy/netiks_store-staging
+```
+
+### Action: Create Staging .env File
+
+```bash
+sudo -u deploy nano .env
+```
+
+This opens the nano text editor as the deploy user.
+
+### Action: Copy This Content
+
+**Paste this template and customize the values:**
+
+```bash
+# Staging Environment Configuration
+# DO NOT commit this file to Git
+
+# Application Environment
+NODE_ENV=staging
+NEXT_PUBLIC_API_BASE_URL=http://<YOUR_VM_IP>:8080/api/v1
+
+# Staging Ports (different from production)
+WEB_EXPOSE_PORT=3002
+GATEWAY_EXPOSE_PORT=8100
+IDENTITY_EXPOSE_PORT=8101
+VENDOR_EXPOSE_PORT=8102
+CATALOG_EXPOSE_PORT=8103
+MEDIA_EXPOSE_PORT=8104
+ADMIN_EXPOSE_PORT=8105
+
+# PostgreSQL Configuration (STAGING DATABASE)
+POSTGRES_DB=netiks_store_staging
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=<GENERATE_NEW_PASSWORD>
+# No POSTGRES_EXPOSE_PORT (internal only)
+
+# JWT Configuration (DIFFERENT from production!)
+JWT_SECRET=<GENERATE_NEW_SECRET>
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Redis Configuration
+REDIS_URL=redis://redis:6379
+
+# Image Registry Configuration
+REGISTRY=netiksstoreregistry.azurecr.io
+IMAGE_TAG=<will-be-set-during-deployment>
+
+# Service URLs (internal Docker network)
+IDENTITY_SERVICE_URL=http://identity-service:8001
+VENDOR_SERVICE_URL=http://vendor-service:8002
+CATALOG_SERVICE_URL=http://catalog-service:8003
+MEDIA_SERVICE_URL=http://media-service:8004
+```
+
+### Action: Generate Secure Secrets
+
+**For `POSTGRES_PASSWORD`:**
+
+On your laptop, run:
+```bash
+openssl rand -hex 32
+```
+
+Copy the output and replace `<GENERATE_NEW_PASSWORD>`.
+
+**For `JWT_SECRET`:**
+
+Run again:
+```bash
+openssl rand -hex 64
+```
+
+Copy the output and replace `<GENERATE_NEW_SECRET>`.
+
+**Replace `<YOUR_VM_IP>`:**
+
+Replace with your actual VM public IP (e.g., `20.29.81.166`).
+
+### Action: Save the .env File
+
+In nano editor:
+1. Press `Ctrl+X` to exit
+2. Press `Y` to confirm save
+3. Press `Enter` to confirm filename
+
+**Expected Output:**
+```
+File written
+```
+
+### Action: Verify .env File Permissions
+
+```bash
+ls -la /home/deploy/netiks_store-staging/.env
+```
+
+**Expected Output:**
+<img width="813" height="167" alt="image" src="https://github.com/user-attachments/assets/0f999ee0-4e51-4666-b433-1c51f264b920" />
+
+**PLACEHOLDER: Screenshot showing .env file created with correct permissions**
+
+---
+
+## Step 6: Verify Staging Environment Setup
+
+### Action: Check Directory Structure
+
+```bash
+tree -L 2 /home/deploy/
+```
+
+**Expected Output:**
+```
+/home/deploy/
+├── netiks_store/              ← Production
+│   ├── .env
+│   ├── docker-compose.yml
+│   ├── docker-compose.prod.yml
+│   ├── apps/
+│   └── services/
+└── netiks_store-staging/      ← Staging
+    ├── .env                   ← Different configuration
+    ├── docker-compose.yml
+    ├── docker-compose.staging.yml
+    ├── apps/
+    └── services/
+```
+
+### Action: Verify .env Differences
+
+Check that staging has different secrets:
+
+```bash
+# Check staging JWT secret (first 20 chars)
+grep JWT_SECRET /home/deploy/netiks_store-staging/.env | cut -c1-40
+
+# Check production JWT secret (first 20 chars)
+grep JWT_SECRET /home/deploy/netiks_store/.env | cut -c1-40
+```
+
+**These should be DIFFERENT!**
+
+**[PLACEHOLDER: Screenshot showing different JWT secrets for staging and production]**
+
+---
+
+## Step 7: Commit Configuration Files to Git
+
+Now commit the new `docker-compose.staging.yml` and updated `docker-compose.yml` to Git.
+
+### Action: Stage Files
+
+On your laptop, in PowerShell:
+
+```bash
+cd g:\projects\netiks_store_wk4
+
+git add docker-compose.yml
+git add docker-compose.staging.yml
+```
+
+### Action: Commit Changes
+
+```bash
+git commit -m "feat: Add staging environment configuration
+
+- Update docker-compose.yml to use environment variables for ports
+- Create docker-compose.staging.yml for SHA-tagged images
+- Staging will use different ports to avoid conflicts with production"
+```
+
+### Action: Push to GitHub
+
+```bash
+git push origin main
+```
+
+**Expected Output:**
+```
+Enumerating objects: 5, done.
+Counting objects: 100% (5/5), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (3/3), 456 bytes | 456.00 KiB/s, done.
+Total 3 (delta 2), reused 0 (delta 0), pack-reused 0
+To github.com:your-org/netiks_store.git
+   abc1234..def5678  main -> main
+```
+
+**[PLACEHOLDER: Screenshot of git commit and push output]**
+
+---
+
+## Part 2 Deliverables Checklist
+
+- [✅] Staging directory created: `/home/deploy/netiks_store-staging`
+- [✅] docker-compose.staging.yml created with SHA-tagged images
+- [✅] docker-compose.yml updated with port environment variables
+- [✅] Staging .env file created with different credentials
+- [✅] Verified staging uses separate database name
+- [✅] Verified staging uses different JWT secret
+- [✅] Configuration files committed to Git
+
+---
+
+---
+
+# PART 3: Add the Staging Deployment Job
+
+Now update your GitHub Actions workflow to automatically deploy to staging after every push to `main`.
+
+---
+
+## Step 1: Open GitHub Actions Workflow File
+
+On your laptop, open:
+
+```
+g:\projects\netiks_store_wk4\.github\workflows\build-and-push.yml
+```
+
+---
+
+## Step 2: Add deploy-staging Job
+
+Scroll to the end of the file (after the `deploy` job) and add this new job:
+
+### Action: Copy and Paste This Job
+
+```yaml
+  deploy-staging:
+    name: 🎭 Deploy to Staging
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: 🔐 Azure Login (OIDC for ACR Token)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 🎟️ Get Short-Lived ACR Token for Staging
+        id: get_acr_token
+        run: |
+          TOKEN=$(az acr login --name netiksstoreregistry --expose-token --query accessToken -o tsv)
+          echo "::add-mask::$TOKEN"
+          echo "ACR_TOKEN=$TOKEN" >> $GITHUB_ENV
+
+      - name: 🎭 Deploy to Staging over SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          ACR_TOKEN: ${{ env.ACR_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: ACR_TOKEN,COMMIT_SHA
+          script: |
+            set -e
+            
+            echo "🔐 Logging into ACR with OIDC token..."
+            echo "$ACR_TOKEN" | docker login netiksstoreregistry.azurecr.io -u 00000000-0000-0000-0000-000000000000 --password-stdin
+            
+            cd /home/deploy/netiks_store-staging
+            
+            echo "📥 Fetching latest main branch..."
+            git fetch origin main
+            git checkout --force main
+            git reset --hard origin/main
+            
+            echo "🏷️ Setting image tag to commit SHA: $COMMIT_SHA"
+            export IMAGE_TAG="$COMMIT_SHA"
+            export REGISTRY="netiksstoreregistry.azurecr.io"
+            
+            echo "📦 Pulling SHA-tagged images..."
+            docker compose \
+              -p netiks_staging \
+              -f docker-compose.yml \
+              -f docker-compose.staging.yml \
+              pull
+            
+            echo "🚀 Starting staging services..."
+            docker compose \
+              -p netiks_staging \
+              -f docker-compose.yml \
+              -f docker-compose.staging.yml \
+              up -d
+            
+            echo "✅ Staging deployment complete!"
+            docker compose -p netiks_staging ps
+```
+
+**Key Elements:**
+- `needs: build-and-push` = Waits for images to be built
+- `if: github.ref == 'refs/heads/main'` = Only runs for pushes to main (not tags)
+- `environment: staging` = Uses staging GitHub environment
+- `github.sha` = Current commit SHA
+- `-p netiks_staging` = Docker Compose project name (isolates from production)
+- `IMAGE_TAG="$COMMIT_SHA"` = Uses SHA-tagged images
+
+### Action: Save the Workflow File
+
+Press `Ctrl+S` to save.
+
+**[PLACEHOLDER: Screenshot of updated build-and-push.yml showing deploy-staging job]**
+
+---
+
+## Step 3: Commit and Push Workflow Changes
+
+### Action: Stage the Workflow File
+
+```bash
+git add .github/workflows/build-and-push.yml
+```
+
+### Action: Commit Changes
+
+```bash
+git commit -m "feat: Add automatic staging deployment
+
+- Deploy to staging automatically after build-and-push
+- Only runs for pushes to main branch (not tags)
+- Uses SHA-tagged images from build job
+- Isolated Docker Compose project: netiks_staging"
+```
+
+### Action: Push to GitHub
+
+```bash
+git push origin main
+```
+
+**Expected Output:**
+```
+Enumerating objects: 7, done.
+Counting objects: 100% (7/7), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (4/4), done.
+Writing objects: 100% (4/4), 789 bytes | 789.00 KiB/s, done.
+Total 4 (delta 3), reused 0 (delta 0), pack-reused 0
+To github.com:your-org/netiks_store.git
+   def5678..ghi9012  main -> main
+```
+
+---
+
+## Step 4: Monitor GitHub Actions Workflow
+
+### Action: Open GitHub Actions in Browser
+
+1. Navigate to: `https://github.com/<YOUR_ORG>/netiks_store/actions`
+2. Click on the latest workflow run (should be running now)
+
+### Action: Watch the Workflow Execute
+
+You should see these jobs running in sequence:
+
+```
+1. 🔍 Validate Code Quality
+2. 🐳 Build and Push Images (7 services in parallel)
+3. 🎭 Deploy to Staging (NEW!)
+```
+
+**[PLACEHOLDER: Screenshot of GitHub Actions showing deploy-staging job running]**
+
+---
+
+## Step 5: Verify Staging Deployment Success
+
+### Action: Click on deploy-staging Job
+
+In GitHub Actions, click the `🎭 Deploy to Staging` job to see logs.
+
+**Expected logs should show:**
+```
+🔐 Logging into ACR with OIDC token...
+Login Succeeded
+
+📥 Fetching latest main branch...
+Already up to date.
+
+🏷️ Setting image tag to commit SHA: abc1234567890
+
+📦 Pulling SHA-tagged images...
+Pulling web              ... done
+Pulling gateway          ... done
+Pulling identity-service ... done
+Pulling vendor-service   ... done
+Pulling catalog-service  ... done
+Pulling media-service    ... done
+Pulling admin-service    ... done
+
+🚀 Starting staging services...
+Creating network "netiks_staging_default" ...
+Creating netiks_staging_postgres_1        ... done
+Creating netiks_staging_redis_1           ... done
+Creating netiks_staging_identity-service_1 ... done
+Creating netiks_staging_vendor-service_1   ... done
+Creating netiks_staging_catalog-service_1  ... done
+Creating netiks_staging_media-service_1    ... done
+Creating netiks_staging_gateway_1          ... done
+Creating netiks_staging_web_1              ... done
+
+✅ Staging deployment complete!
+
+NAME                               IMAGE                                                  STATUS
+netiks_staging_web_1              netiksstoreregistry.azurecr.io/web:abc1234567890      Up 10 seconds
+netiks_staging_gateway_1          netiksstoreregistry.azurecr.io/gateway:abc1234567890  Up 10 seconds
+...
+```
+
+**[PLACEHOLDER: Screenshot of successful deploy-staging job logs]**
+
+---
+
+## Part 3 Question: Why does `deploy-staging` use `needs: build-and-push`?
+
+### Answer
+
+```yaml
+deploy-staging:
+  needs: build-and-push
+```
+
+**The `needs: build-and-push` dependency is critical because:**
+
+**1. Image Availability Requirement**
+
+```
+Staging deployment pulls images:
+    docker compose pull
+    ↓
+Pulls: netiksstoreregistry.azurecr.io/web:abc123
+    ↓
+These images don't exist until build-and-push creates them!
+
+Without needs:
+    deploy-staging starts immediately
+    ↓
+    docker compose pull fails
+    ↓
+    Error: "manifest not found"
+    ↓
+    ❌ Deployment fails
+
+With needs:
+    build-and-push completes first
+    ↓
+    All 7 images pushed to registry
+    ↓
+    deploy-staging starts
+    ↓
+    docker compose pull succeeds
+    ↓
+    ✅ Deployment succeeds
+```
+
+**2. Deployment Ordering**
+
+```
+Correct sequence:
+1. Build images (build-and-push)
+2. Push to registry (build-and-push)
+3. Pull from registry (deploy-staging)
+4. Start services (deploy-staging)
+
+Without needs: Steps 3-4 happen before steps 1-2 = FAIL
+With needs: Steps happen in correct order = SUCCESS
+```
+
+**3. SHA Tag Synchronization**
+
+```
+Commit abc123 pushed to main
+    ↓
+build-and-push job:
+    Builds web:abc123
+    Pushes web:abc123 to registry
+    ↓
+deploy-staging job (needs: build-and-push):
+    IMAGE_TAG=abc123
+    Pulls web:abc123 (exists!)
+    ✅ Correct image deployed
+
+Without needs:
+    deploy-staging might run before images exist
+    ❌ Wrong image or failure
+```
+
+**4. Build Failure Protection**
+
+```
+Scenario: Build fails due to syntax error
+
+With needs:
+    build-and-push: FAILED
+    ↓
+    deploy-staging: SKIPPED (needs not met)
+    ↓
+    Staging stays at previous version
+    ✅ Safe
+
+Without needs:
+    build-and-push: FAILED
+    deploy-staging: RUNS ANYWAY
+    ↓
+    Tries to pull non-existent images
+    ❌ Confusing failure
+```
+
+**5. Dependency Visualization**
+
+```
+GitHub Actions shows:
+    ┌─────────────────┐
+    │   validate      │
+    └────────┬────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ build-and-push  │  ← Build 7 images
+    └────────┬────────┘
+             │ needs: build-and-push
+             ▼
+    ┌─────────────────┐
+    │ deploy-staging  │  ← Pull those 7 images
+    └─────────────────┘
+
+Clear dependency graph
+```
+
+**Summary:**
+> `needs: build-and-push` ensures images are built and pushed to the registry BEFORE staging tries to pull and deploy them. Without it, staging would try to pull images that don't exist yet, causing deployment failures.
+
+---
+
+---
+
+# PART 4: Configure GitHub Staging Environment
+
+Create a GitHub Environment for staging with deployment credentials.
+
+---
+
+## Step 1: Create Staging Environment in GitHub
+
+### Action: Navigate to GitHub Repository Settings
+
+1. Open browser to: `https://github.com/<YOUR_ORG>/netiks_store`
+2. Click **Settings** (top navigation bar)
+3. Click **Environments** (left sidebar)
+
+**[PLACEHOLDER: Screenshot of GitHub repository Settings page with Environments highlighted]**
+
+---
+
+### Action: Create New Environment
+
+1. Click **New environment** button (green button)
+2. Enter name: `staging`
+3. Click **Configure environment**
+
+**[PLACEHOLDER: Screenshot of "New environment" dialog with "staging" entered]**
+
+---
+
+## Step 2: Configure Staging Environment (No Approval Required)
+
+You're now on the staging environment configuration page.
+
+### Action: Verify No Required Reviewers
+
+**DO NOT add required reviewers for staging.**
+
+Staging should deploy automatically without approval.
+
+**Verify:**
+- "Required reviewers" section should remain empty
+- No checkboxes selected
+
+**Why no approval for staging:**
+- Fast feedback loop needed
+- No real users affected
+- Encourages frequent testing
+
+**[PLACEHOLDER: Screenshot showing staging environment with NO required reviewers configured]**
+
+---
+
+## Step 3: Add Staging Environment Secrets
+
+Staging will use the same VM and deploy user as production, so the secrets are identical.
+
+### Action: Add DEPLOY_SSH_KEY Secret
+
+1. Scroll down to "Environment secrets" section
+2. Click **Add secret** button
+3. Enter Name: `DEPLOY_SSH_KEY`
+4. Value: Contents of your `netiks_deploy_key` private key file
+   ```bash
+   # On your laptop, display the key:
+   cat netiks_deploy_key
+   
+   # Copy entire output including:
+   # -----BEGIN OPENSSH PRIVATE KEY-----
+   # ... key contents ...
+   # -----END OPENSSH PRIVATE KEY-----
+   ```
+5. Click **Add secret**
+
+---
+
+### Action: Add DEPLOY_HOST Secret
+
+1. Click **Add secret** again
+2. Enter Name: `DEPLOY_HOST`
+3. Value: Your VM public IP (e.g., `20.29.81.166`)
+4. Click **Add secret**
+
+---
+
+### Action: Add DEPLOY_USER Secret
+
+1. Click **Add secret** again
+2. Enter Name: `DEPLOY_USER`
+3. Value: `deploy`
+4. Click **Add secret**
+
+---
+
+### Action: Verify All Three Secrets Are Added
+
+The "Environment secrets" section should now show:
+- `DEPLOY_SSH_KEY`
+- `DEPLOY_HOST`
+- `DEPLOY_USER`
+
+**[PLACEHOLDER: Screenshot of staging environment showing three secret NAMES only (not values)]**
+
+---
+
+## Part 4 Question: What prevents the staging deployment from changing the production containers?
+
+### Answer
+
+**Five layers of isolation prevent staging from affecting production:**
+
+### 1. Docker Compose Project Name
+
+```yaml
+# Production deployment:
+docker compose up -d
+# Default project name: netiks_store (from directory name)
+# Containers: netiks_store_web_1, netiks_store_gateway_1
+
+# Staging deployment:
+docker compose -p netiks_staging up -d
+# Project name: netiks_staging (explicitly set)
+# Containers: netiks_staging_web_1, netiks_staging_gateway_1
+
+Result:
+    Production containers: netiks_store_*
+    Staging containers: netiks_staging_*
+    ✅ Completely separate
+```
+
+### 2. Separate Working Directories
+
+```bash
+Production:
+    Working directory: /home/deploy/netiks_store
+    docker-compose.yml path: /home/deploy/netiks_store/docker-compose.yml
+    .env path: /home/deploy/netiks_store/.env
+
+Staging:
+    Working directory: /home/deploy/netiks_store-staging
+    docker-compose.yml path: /home/deploy/netiks_store-staging/docker-compose.yml
+    .env path: /home/deploy/netiks_store-staging/.env
+
+Result:
+    Different configuration files loaded
+    Different environment variables used
+    ✅ Isolated configurations
+```
+
+### 3. Separate Ports
+
+```bash
+# Production .env:
+WEB_EXPOSE_PORT=3001
+GATEWAY_EXPOSE_PORT=8000
+
+# Staging .env:
+WEB_EXPOSE_PORT=3002
+GATEWAY_EXPOSE_PORT=8100
+
+Result:
+    Production web: localhost:3001 → container:3000
+    Staging web: localhost:3002 → container:3000
+    ✅ No port conflicts
+```
+
+### 4. Separate Docker Networks
+
+```bash
+# Docker Compose creates isolated networks per project
+
+Production network:
+    netiks_store_default
+    └─ Contains: web, gateway, postgres, redis (production)
+
+Staging network:
+    netiks_staging_default
+    └─ Contains: web, gateway, postgres, redis (staging)
+
+Result:
+    Services cannot communicate across networks
+    Production database isolated from staging
+    ✅ Network isolation
+```
+
+### 5. Separate Database Volumes
+
+```bash
+# Production .env:
+POSTGRES_DB=netiks_store
+
+# Staging .env:
+POSTGRES_DB=netiks_store_staging
+
+# Docker creates separate volumes:
+Production volume: netiks_store_postgres_data
+    └─ Contains: netiks_store database
+
+Staging volume: netiks_staging_postgres_data
+    └─ Contains: netiks_store_staging database
+
+Result:
+    Different database files
+    Different data
+    ✅ Data isolation
+```
+
+---
+
+### How Isolation Works in Practice
+
+**When staging deploys:**
+
+```bash
+cd /home/deploy/netiks_store-staging  # ← Different directory
+export IMAGE_TAG="abc123"             # ← SHA-tagged image
+export REGISTRY="netiksstoreregistry.azurecr.io"
+
+docker compose \
+  -p netiks_staging \                # ← Different project name
+  -f docker-compose.yml \
+  -f docker-compose.staging.yml \    # ← Staging config
+  up -d
+
+Docker Compose:
+1. Reads .env from /home/deploy/netiks_store-staging
+2. Creates containers with netiks_staging_ prefix
+3. Uses WEB_EXPOSE_PORT=3002 from staging .env
+4. Connects to netiks_store_staging database
+5. Creates netiks_staging_default network
+6. Starts staging containers
+
+Production containers completely unaware!
+```
+
+**When production deploys:**
+
+```bash
+cd /home/deploy/netiks_store          # ← Different directory
+export IMAGE_TAG="v1.3.0"             # ← Version tag
+
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.prod.yml \         # ← Production config
+  up -d                                # ← Default project (netiks_store)
+
+Docker Compose:
+1. Reads .env from /home/deploy/netiks_store
+2. Creates containers with netiks_store_ prefix
+3. Uses WEB_EXPOSE_PORT=3001 from production .env
+4. Connects to netiks_store database
+5. Uses netiks_store_default network
+6. Starts production containers
+
+Staging containers completely unaware!
+```
+
+---
+
+### Verification Test
+
+```bash
+# List all containers:
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+
+Output:
+NAME                          PORTS
+netiks_store_web_1           0.0.0.0:3001->3000/tcp    ← Production
+netiks_store_gateway_1       0.0.0.0:8000->8000/tcp    ← Production
+netiks_staging_web_1         0.0.0.0:3002->3000/tcp    ← Staging
+netiks_staging_gateway_1     0.0.0.0:8100->8000/tcp    ← Staging
+
+✅ Different names, different ports, complete isolation
+```
+
+---
+
+### Summary: Five Isolation Layers
+
+| Isolation Layer | Production | Staging | Prevents |
+|----------------|-----------|---------|----------|
+| **Project Name** | netiks_store | netiks_staging | Container name conflicts |
+| **Directory** | /home/deploy/netiks_store | /home/deploy/netiks_store-staging | Config file conflicts |
+| **Ports** | 3001, 8000 | 3002, 8100 | Port conflicts |
+| **Network** | netiks_store_default | netiks_staging_default | Service cross-talk |
+| **Database** | netiks_store | netiks_store_staging | Data conflicts |
+
+**Conclusion:**
+> The Docker Compose project name (`-p netiks_staging`) combined with separate directories, ports, networks, and database volumes creates complete isolation. Staging deployments cannot affect production containers, data, or configuration.
+
+---
+
+---
+
+# PART 5: Configure Staging Access via Nginx
+
+Configure Nginx to route traffic to staging on port 8080 while production remains on port 80.
+
+---
+
+## Step 1: SSH into VM
+
+```bash
+ssh azureuser@<YOUR_VM_IP>
+```
+
+---
+
+## Step 2: Create Nginx Staging Configuration
+
+### Action: Create Staging Site Configuration
+
+```bash
+sudo nano /etc/nginx/sites-available/netiks_store_staging
+```
+
+This opens nano text editor.
+
+---
+
+### Action: Paste This Configuration
+
+```nginx
+server {
+    listen 8080;
+    server_name _;
+
+    client_max_body_size 20M;
+
+    # API Gateway for staging
+    location /api/ {
+        proxy_pass http://127.0.0.1:8100;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Web frontend for staging
+    location / {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+**Key points:**
+- `listen 8080` = Staging accessible on port 8080
+- `/api/` → `http://127.0.0.1:8100` = Staging gateway port
+- `/` → `http://127.0.0.1:3002` = Staging web port
+- Production still uses port 80 (unchanged)
+
+---
+
+### Action: Save the File
+
+In nano:
+1. Press `Ctrl+X`
+2. Press `Y` to confirm
+3. Press `Enter`
+
+**Expected output:**
+```
+File written
+```
+
+**[PLACEHOLDER: Screenshot of Nginx staging configuration in nano editor]**
+
+---
+
+## Step 3: Enable Staging Site
+
+### Action: Create Symbolic Link
+
+```bash
+sudo ln -s /etc/nginx/sites-available/netiks_store_staging /etc/nginx/sites-enabled/
+```
+
+This activates the staging configuration.
+
+---
+
+### Action: Verify Symbolic Link
+
+```bash
+ls -la /etc/nginx/sites-enabled/
+```
+
+**Expected output:**
+```
+lrwxrwxrwx 1 root root   51 Sep 20 12:00 netiks_store -> /etc/nginx/sites-available/netiks_store
+lrwxrwxrwx 1 root root   59 Sep 20 12:05 netiks_store_staging -> /etc/nginx/sites-available/netiks_store_staging
+```
+
+**[PLACEHOLDER: Screenshot showing both production and staging Nginx site links]**
+
+---
+
+## Step 4: Test Nginx Configuration
+
+### Action: Validate Nginx Config
+
+```bash
+sudo nginx -t
+```
+
+**Expected output:**
+```
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+```
+
+**If you see errors:**
+- Check for typos in the config file
+- Verify ports match your staging .env
+- Re-edit: `sudo nano /etc/nginx/sites-available/netiks_store_staging`
+
+**[PLACEHOLDER: Screenshot of successful `sudo nginx -t` output]**
+
+---
+
+## Step 5: Reload Nginx
+
+### Action: Reload Nginx to Apply Changes
+
+```bash
+sudo systemctl reload nginx
+```
+
+**Expected output:**
+```
+(no output = success)
+```
+
+---
+
+### Action: Verify Nginx is Running
+
+```bash
+sudo systemctl status nginx
+```
+
+**Expected output:**
+```
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)
+     Active: active (running) since ...
+```
+
+Press `q` to exit.
+
+**[PLACEHOLDER: Screenshot of nginx status showing active (running)]**
+
+---
+
+## Step 6: Open Port 8080 in Azure NSG
+
+### Action: Navigate to Azure Portal
+
+1. Open browser to: `https://portal.azure.com`
+2. Navigate to: Virtual Machines → Your VM → Networking
+3. Click **Network settings** (left sidebar)
+
+---
+
+### Action: Add Inbound Port Rule
+
+1. Click **Create port rule** button
+2. Select **Inbound port rule**
+3. Configure:
+   - **Source:** IP Addresses (or Any for testing)
+   - **Source IP addresses/CIDR ranges:** Your IP or leave blank
+   - **Source port ranges:** *
+   - **Destination:** Any
+   - **Service:** Custom
+   - **Destination port ranges:** `8080`
+   - **Protocol:** TCP
+   - **Action:** Allow
+   - **Priority:** `1030` (or next available)
+   - **Name:** `Allow_Staging_8080`
+   - **Description:** "Allow access to staging environment"
+4. Click **Add**
+
+**[PLACEHOLDER: Screenshot of Azure NSG inbound rule for port 8080]**
+
+---
+
+### Action: Verify Port is Open
+
+Wait 30 seconds for Azure to apply the rule, then test:
+
+```bash
+# On your laptop:
+curl http://<YOUR_VM_IP>:8080/api/v1/system/services
+```
+
+**Expected output:**
+```json
+{
+  "status": "ok",
+  "services": [
+    {"name": "identity-service", "url": "http://identity-service:8001"},
+    {"name": "vendor-service", "url": "http://vendor-service:8002"},
+    {"name": "catalog-service", "url": "http://catalog-service:8003"},
+    {"name": "media-service", "url": "http://media-service:8004"}
+  ]
+}
+```
+
+**If connection refused:**
+- Verify Azure NSG rule is saved
+- Check Nginx is running: `sudo systemctl status nginx`
+- Verify staging containers are running: `docker compose -p netiks_staging ps`
+
+**[PLACEHOLDER: Screenshot of successful curl to staging API endpoint]**
+
+---
+
+## Part 5 Deliverables Checklist
+
+- [✅] Nginx staging configuration created
+- [✅] nginx -t test passed
+- [✅] Nginx reloaded successfully
+- [✅] Azure NSG rule for port 8080 created
+- [✅] Staging endpoint accessible via port 8080
+
+---
+
+---
+
+# PART 6: Test the Complete Flow
+
+Now test the complete staging-to-production workflow.
+
+---
+
+## Test 6.1: Deploy to Staging
+
+Make a visible change to test the staging deployment.
+
+---
+
+### Step 1: Make Visible Application Change
+
+On your laptop, open the home page:
+
+```
+g:\projects\netiks_store_wk4\apps\web\src\app\page.tsx
+```
+
+### Action: Add Version Indicator
+
+Find the return statement and add a visible version banner.
+
+**Add this near the top of the JSX (around line 10-15):**
+
+```tsx
+export default function HomePage() {
+  return (
+    <div className="min-h-screen">
+      {/* Version indicator for Week 6 testing */}
+      <div className="bg-blue-600 text-white text-center py-2 text-sm font-semibold">
+        🎭 STAGING VERSION - Week 6 Lab - Commit: {process.env.NEXT_PUBLIC_COMMIT_SHA || 'latest'}
+      </div>
+      
+      {/* Rest of your existing JSX */}
+      <header>
+        ...
+      </header>
+    </div>
+  );
+}
+```
+
+### Action: Save the File
+
+Press `Ctrl+S`.
+
+**[PLACEHOLDER: Screenshot of page.tsx with version indicator added]**
+
+---
+
+### Step 2: Commit and Push to Main
+
+### Action: Stage and Commit Changes
+
+```bash
+cd g:\projects\netiks_store_wk4
+
+git add apps/web/src/app/page.tsx
+git commit -m "feat: Add staging version indicator for Week 6 testing"
+```
+
+### Action: Push to GitHub
+
+```bash
+git push origin main
+```
+
+**Expected output:**
+```
+Enumerating objects: 9, done.
+Counting objects: 100% (9/9), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (5/5), done.
+Writing objects: 100% (5/5), 567 bytes | 567.00 KiB/s, done.
+Total 5 (delta 4), reused 0 (delta 0), pack-reused 0
+To github.com:your-org/netiks_store.git
+   ghi9012..jkl3456  main -> main
+```
+
+**[PLACEHOLDER: Screenshot of git push output]**
+
+---
+
+### Step 3: Monitor GitHub Actions Workflow
+
+### Action: Open GitHub Actions
+
+Navigate to: `https://github.com/<YOUR_ORG>/netiks_store/actions`
+
+### Action: Watch Workflow Execute
+
+The workflow should run automatically with these jobs:
+
+```
+1. 🔍 Validate Code Quality
+2. 🐳 Build and Push Images (7 services)
+3. 🎭 Deploy to Staging ← Automatic!
+```
+
+**Note:** The `🚀 Deploy to Production` job should NOT run (no version tag).
+
+**[PLACEHOLDER: Screenshot of GitHub Actions showing deploy-staging running automatically]**
+
+---
+
+### Step 4: Verify Staging Deployment
+
+### Action: Wait for Staging Deployment to Complete
+
+Watch the deploy-staging job logs until you see:
+
+```
+✅ Staging deployment complete!
+docker compose -p netiks_staging ps
+
+NAME                               IMAGE                                                STATUS
+netiks_staging_web_1              netiksstoreregistry.azurecr.io/web:jkl3456           Up 10 seconds
+netiks_staging_gateway_1          netiksstoreregistry.azurecr.io/gateway:jkl3456       Up 10 seconds
+...
+```
+
+**[PLACEHOLDER: Screenshot of successful staging deployment logs]**
+
+---
+
+### Step 5: Test Staging Application
+
+### Action: Open Staging in Browser
+
+Navigate to: `http://<YOUR_VM_IP>:8080/`
+
+Example: `http://20.29.81.166:8080/`
+
+**You should see:**
+- ✅ Blue banner with "🎭 STAGING VERSION - Week 6 Lab"
+- ✅ Application loads normally
+- ✅ Products visible (if seeded)
+
+**[PLACEHOLDER: Screenshot of staging application showing version indicator]**
+
+---
+
+### Step 6: Verify Production is Unchanged
+
+### Action: Open Production in Browser
+
+Navigate to: `http://<YOUR_VM_IP>/`
+
+Example: `http://20.29.81.166/`
+
+**You should see:**
+- ✅ NO blue version banner
+- ✅ Application unchanged from previous version
+- ✅ Old version still running
+
+**[PLACEHOLDER: Screenshot of production showing NO version indicator (unchanged)]**
+
+---
+
+## Test 6.2: Promote to Production
+
+Now follow the Week 5 release process to deploy to production.
+
+---
+
+### Step 1: Update Production Version in docker-compose.prod.yml
+
+On your laptop, open:
+
+```
+g:\projects\netiks_store_wk4\docker-compose.prod.yml
+```
+
+### Action: Update All Image Tags
+
+Change all versions from current (e.g., `v1.2.0`) to new version (`v1.3.0`):
+
+**Update these services:**
+
+```yaml
+services:
+  web:
+    image: netiksstoreregistry.azurecr.io/web:v1.3.0
+    pull_policy: always
+  
+  gateway:
+    image: netiksstoreregistry.azurecr.io/gateway:v1.3.0
+    pull_policy: always
+  
+  identity-service:
+    image: netiksstoreregistry.azurecr.io/identity-service:v1.3.0
+    pull_policy: always
+  
+  vendor-service:
+    image: netiksstoreregistry.azurecr.io/vendor-service:v1.3.0
+    pull_policy: always
+  
+  catalog-service:
+    image: netiksstoreregistry.azurecr.io/catalog-service:v1.3.0
+    pull_policy: always
+  
+  media-service:
+    image: netiksstoreregistry.azurecr.io/media-service:v1.3.0
+    pull_policy: always
+  
+  admin-service:
+    image: netiksstoreregistry.azurecr.io/admin-service:v1.3.0
+    pull_policy: always
+```
+
+### Action: Save docker-compose.prod.yml
+
+Press `Ctrl+S`.
+
+**[PLACEHOLDER: Screenshot of updated docker-compose.prod.yml with v1.3.0]**
+
+---
+
+### Step 2: Commit Production Version
+
+### Action: Stage and Commit
+
+```bash
+git add docker-compose.prod.yml
+git commit -m "release: v1.3.0"
+```
+
+---
+
+### Step 3: Create Version Tag
+
+### Action: Tag the Release
+
+```bash
+git tag v1.3.0
+```
+
+---
+
+### Step 4: Push Tag to GitHub
+
+### Action: Push Main and Tags
+
+```bash
+git push origin main --tags
+```
+
+**Expected output:**
+```
+Enumerating objects: 5, done.
+Counting objects: 100% (5/5), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (3/3), 345 bytes | 345.00 KiB/s, done.
+Total 3 (delta 2), reused 0 (delta 0), pack-reused 0
+To github.com:your-org/netiks_store.git
+   jkl3456..mno7890  main -> main
+ * [new tag]         v1.3.0 -> v1.3.0
+```
+
+**[PLACEHOLDER: Screenshot of git push with tag]**
+
+---
+
+### Step 5: Monitor Production Deployment Workflow
+
+### Action: Open GitHub Actions
+
+The workflow should now run with ALL jobs:
+
+```
+1. 🔍 Validate Code Quality
+2. 🐳 Build and Push Images
+3. 🎭 Deploy to Staging (automatic)
+4. 🚀 Deploy to Production (waiting for approval) ← NEW!
+```
+
+**[PLACEHOLDER: Screenshot showing production deployment waiting for approval]**
+
+---
+
+### Step 6: Approve Production Deployment
+
+### Action: Review and Approve
+
+1. Click **Review deployments** button in GitHub Actions
+2. Check the `production` checkbox
+3. Optional: Add approval comment: "Tested in staging, ready for production"
+4. Click **Approve and deploy**
+
+**[PLACEHOLDER: Screenshot of production approval dialog]**
+
+---
+
+### Step 7: Monitor Production Deployment
+
+Watch the production deployment logs until complete:
+
+```
+🚀 Deploying version: v1.3.0
+
+📥 Checking out v1.3.0...
+Already up to date.
+
+📦 Pulling v1.3.0 images...
+Pulling web              ... done
+Pulling gateway          ... done
+...
+
+🚀 Starting production services...
+Recreating netiks_store_web_1      ... done
+Recreating netiks_store_gateway_1  ... done
+...
+
+✅ Production deployment complete!
+```
+
+**[PLACEHOLDER: Screenshot of successful production deployment]**
+
+---
+
+### Step 8: Verify Production Has the Change
+
+### Action: Open Production in Browser
+
+Navigate to: `http://<YOUR_VM_IP>/`
+
+**You should now see:**
+- ✅ Blue banner with "🎭 STAGING VERSION"
+- ✅ Version indicator visible
+- ✅ Same as staging
+
+**[PLACEHOLDER: Screenshot of production showing version indicator (now deployed)]**
+
+---
+
+### Step 9: Verify Staging Still Running
+
+### Action: Open Staging in Browser
+
+Navigate to: `http://<YOUR_VM_IP>:8080/`
+
+**You should see:**
+- ✅ Staging still accessible
+- ✅ Version indicator still visible
+- ✅ Running independently
+
+**[PLACEHOLDER: Screenshot of staging still running after production deployment]**
+
+---
+
+## Test 6.3: Verify Isolation Between Environments
+
+Test that staging and production are truly isolated.
+
+---
+
+### Step 1: Check Both Environments Running
+
+### Action: SSH into VM
+
+```bash
+ssh azureuser@<YOUR_VM_IP>
+```
+
+### Action: List Staging Containers
+
+```bash
+docker compose -p netiks_staging ps
+```
+
+**Expected output:**
+```
+NAME                               IMAGE                                                STATUS          PORTS
+netiks_staging_web_1              netiksstoreregistry.azurecr.io/web:jkl3456          Up 30 minutes   0.0.0.0:3002->3000/tcp
+netiks_staging_gateway_1          netiksstoreregistry.azurecr.io/gateway:jkl3456      Up 30 minutes   0.0.0.0:8100->8000/tcp
+netiks_staging_identity-service_1 netiksstoreregistry.azurecr.io/identity-service:jkl3456 Up 30 minutes 0.0.0.0:8101->8001/tcp
+...
+```
+
+**[PLACEHOLDER: Screenshot of docker compose -p netiks_staging ps output]**
+
+---
+
+### Action: List Production Containers
+
+```bash
+docker compose ps
+```
+
+**Expected output:**
+```
+NAME                          IMAGE                                              STATUS          PORTS
+netiks_store_web_1           netiksstoreregistry.azurecr.io/web:v1.3.0         Up 10 minutes   0.0.0.0:3001->3000/tcp
+netiks_store_gateway_1       netiksstoreregistry.azurecr.io/gateway:v1.3.0     Up 10 minutes   0.0.0.0:8000->8000/tcp
+netiks_store_identity-service_1 netiksstoreregistry.azurecr.io/identity-service:v1.3.0 Up 10 minutes 0.0.0.0:8001->8001/tcp
+...
+```
+
+**[PLACEHOLDER: Screenshot of docker compose ps output for production]**
+
+---
+
+### Step 2: Stop Staging Web Service
+
+### Action: Stop Only Staging Web Container
+
+```bash
+docker compose -p netiks_staging stop web
+```
+
+**Expected output:**
+```
+Stopping netiks_staging_web_1 ... done
+```
+
+---
+
+### Action: Verify Staging Web is Stopped
+
+```bash
+docker compose -p netiks_staging ps web
+```
+
+**Expected output:**
+```
+NAME                  IMAGE                                    STATUS
+netiks_staging_web_1  netiksstoreregistry.azurecr.io/web:...  Exited (0) 5 seconds ago
+```
+
+---
+
+### Step 3: Verify Production Still Works
+
+### Action: Check Production Web is Running
+
+```bash
+docker compose ps web
+```
+
+**Expected output:**
+```
+NAME                IMAGE                                         STATUS
+netiks_store_web_1  netiksstoreregistry.azurecr.io/web:v1.3.0    Up 15 minutes
+```
+
+**[PLACEHOLDER: Screenshot showing staging web stopped but production web running]**
+
+---
+
+### Action: Test Production in Browser
+
+Open: `http://<YOUR_VM_IP>/`
+
+**You should see:**
+- ✅ Production works perfectly
+- ✅ Application loads
+- ✅ No errors
+
+**[PLACEHOLDER: Screenshot of production working while staging web is stopped]**
+
+---
+
+### Action: Test Staging Fails
+
+Open: `http://<YOUR_VM_IP>:8080/`
+
+**You should see:**
+- ❌ "502 Bad Gateway" or connection error
+- ❌ Nginx cannot reach staging web service
+
+This proves staging and production are isolated.
+
+---
+
+### Step 4: Restore Staging
+
+### Action: Start Staging Web Again
+
+```bash
+docker compose -p netiks_staging start web
+```
+
+**Expected output:**
+```
+Starting netiks_staging_web_1 ... done
+```
+
+---
+
+### Action: Verify Staging Works Again
+
+Open: `http://<YOUR_VM_IP>:8080/`
+
+**You should see:**
+- ✅ Staging restored
+- ✅ Application loads
+- ✅ Version indicator visible
+
+**[PLACEHOLDER: Screenshot of staging working after being restarted]**
+
+---
+
+## Part 6 Deliverables Checklist
+
+- [✅] Screenshot of automatic staging deployment
+- [✅] Screenshot showing change in staging
+- [✅] Screenshot showing change NOT in production (before promotion)
+- [✅] Screenshot of production approval
+- [✅] Screenshot of successful production deployment
+- [✅] Screenshot showing change NOW in production (after promotion)
+- [✅] `docker compose -p netiks_staging ps` output
+- [✅] `docker compose ps` output (production)
+- [✅] Screenshot of isolation test (staging stopped, production working)
+
+---
+
+
+---
+
+# 🚀 Netiks Store - Week 5 Lab: CI/CD Deployment Pipeline
+## Complete Step-by-Step Implementation Guide
+
+**Date:** September 17, 2026  
+
+**Prerequisite:** Week 4 Lab (OIDC setup with working CI/CD pipeline)
+
+---
+
+## Executive Summary
+
+In Week 4, The CI/CD pipeline built and pushed Docker images to Azure Container Registry. However, deployment to production was still manual—I had to SSH into the VM and run Docker Compose commands.
+
+**Week 5 Goal:** Fully automate the deployment pipeline so that pushing a version tag triggers a complete, approved deployment to production with the ability to rollback to previous versions.
+
+**What I'll build:**
+- Dedicated deployment account on VM (security best practice)
+- GitHub Environment with approval gates
+- Automated SSH deployment from GitHub Actions
+- Manual rollback capability through `workflow_dispatch`
+
+---
+
+# PART 1: Understand the Basics
+
+## Question 1: Which manual commands from Week 4 Part 6 are being replaced by automation this week?
+
+### Answer
+
+The following manual commands from Week 4 Part 6 that I had to execute on the VM are being automated:
+
+```bash
+# Manual commands you had to SSH and run
+git pull origin main
+
+az acr login --name netiksstoreacr
+
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.prod.yml \
+  pull
+
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.prod.yml \
+  up -d
+
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.prod.yml \
+  ps
+```
+
+**Automation this week:** GitHub Actions will SSH into the VM and execute these exact commands automatically when a version tag is pushed and approved. This eliminates the need for manual SSH access to deploy new versions.
+
+---
+
+## Question 2: SSH does not support OIDC. Why is storing a dedicated CI deployment key safer than reusing your personal SSH key? What should you do if the deployment key is ever leaked?
+
+### Answer
+
+#### Why a Dedicated Deployment Key is Safer:
+
+1. **Principle of Least Privilege:** The deployment key only has permissions to pull the repository and run Docker Compose on the VM. Your personal SSH key has full administrative access to the VM.
+
+2. **Scope Limitation:** If the deployment key is compromised, the attacker can only deploy applications. They cannot access your personal files, change system configurations, or perform administrative tasks.
+
+3. **Auditability:** You can track which deployments were made with the deployment key versus your personal key.
+
+4. **Revocation:** You can delete the deployment key from the VM without affecting your personal SSH access.
+
+5. **Credential Rotation:** It's easier and safer to rotate a single-purpose key than to replace your main access method.
+
+#### If the Deployment Key Is Leaked:
+
+1. **Immediately delete** the compromised key from `/home/deploy/.ssh/authorized_keys`:
+   ```bash
+   sudo sed -i '/github-actions-deploy/d' /home/deploy/.ssh/authorized_keys
+   ```
+
+2. **Generate a new deployment key:**
+   ```bash
+   ssh-keygen -t ed25519 -f netiks_deploy_key -C "github-actions-deploy" -N ""
+   ```
+
+3. **Add the new public key** to the VM:
+   ```bash
+   sudo tee -a /home/deploy/.ssh/authorized_keys < netiks_deploy_key.pub
+   ```
+
+4. **Update the GitHub secret:**
+   - Go to Repository → Settings → Environments → production → Secrets
+   - Update `DEPLOY_SSH_KEY` with the contents of the new `netiks_deploy_key`
+
+5. **Verify the new key works** by testing SSH access:
+   ```bash
+   ssh -i netiks_deploy_key deploy@<DEPLOY_HOST>
+   ```
+
+---
+
+## Question 3: What is the difference between a push-based deployment and a pull-based deployment?
+
+### Answer
+
+#### Push-Based Deployment
+
+**How it works:**
+- CI/CD system (GitHub Actions) **actively connects** to the production environment
+- CI/CD system **pushes changes** to the VM
+- CI/CD system has credentials to access production
+
+**Characteristics:**
+- ✅ Deployment happens immediately when triggered
+- ✅ Fast feedback loop
+- ❌ CI/CD system needs production credentials
+- ❌ Production environment must be accessible from CI/CD runner
+- ❌ If CI/CD credentials are compromised, production is exposed
+
+**Example:** GitHub Actions SSH into VM and run Docker Compose
+
+#### Pull-Based Deployment
+
+**How it works:**
+- Production environment (VM) **actively checks** for new versions
+- VM **pulls changes** from a source (Git repository, registry, configuration)
+- VM has credentials to access the repository/registry
+- Typically uses a controller (e.g., ArgoCD, Flux)
+
+**Characteristics:**
+- ✅ Production credentials never leave the production environment
+- ✅ CI/CD system only needs to publish artifacts
+- ✅ More secure for production
+- ❌ Deployment has a delay (polling interval)
+- ❌ Requires running a controller daemon on production
+
+**Example:** GitOps with ArgoCD watching repository for changes
+
+#### Comparison Table
+
+| Factor | Push-Based | Pull-Based |
+|--------|-----------|-----------|
+| **Initiator** | CI/CD system | Production environment |
+| **Speed** | Immediate | Delayed (polling interval) |
+| **Security** | Requires CI → Prod access | No outbound access needed |
+| **Credentials** | Stored in CI system | Stored on production |
+| **Complexity** | Simpler setup | Requires controller |
+| **Use Case** | Week 5 (Netiks) | Week 6+ (staging/prod) |
+
+---
+
+## Question 4: Which model are we building this week - push-based deployment or pull-based deployment?
+
+### Answer
+
+**We are building a PUSH-BASED deployment model.**
+
+**Why:**
+- GitHub Actions (CI/CD system) will SSH into the VM
+- GitHub Actions will execute Docker Compose commands on the VM
+- The VM is passive and only receives deployment commands
+- This is simpler to implement for a first automated deployment
+
+**How it works for Netiks Store:**
+1. Developer pushes version tag (e.g., `v1.2.0`)
+2. GitHub Actions builds and pushes images
+3. GitHub Actions **pushes** deployment command to VM via SSH
+4. VM executes the command and updates services
+
+**Why not pull-based for Week 5:**
+- Push-based is simpler and clearer for learning
+- Pull-based will be introduced in Week 6 with staging environments
+- Push-based provides immediate deployment feedback
+
+---
+
+---
+
+# PART 2: Prepare the VM for Remote Deployment
+
+## Step 1: Create Deployment User on VM
+
+This section creates a dedicated, unprivileged deployment account for GitHub Actions to use instead of your personal account.
+
+### Action: Create the Deployment User
+
+SSH into your VM and execute:
+
+```bash
+# Create user without password login
+sudo adduser --disabled-password deploy
+
+# Add deploy user to docker group (allows Docker commands without sudo)
+sudo usermod -aG docker deploy
+```
+
+### Expected Output:
+
+<img width="579" height="553" alt="Screenshot 2026-09-15 160203" src="https://github.com/user-attachments/assets/6ce08a0f-02f4-4891-884e-84ab999983bc" />
+
+
+### Verify Creation:
+
+```bash
+# Check user exists
+id deploy
+
+# Verify docker group membership
+groups deploy
+```
+
+<img width="512" height="165" alt="Screenshot 2026-09-15 162446" src="https://github.com/user-attachments/assets/4486f9b8-12f4-4869-8508-a42d2ef8fff7" />
+
+---
+
+## Step 2: Generate Dedicated SSH Key Pair
+
+Create a new SSH key specifically for CI/CD deployment. **Never reuse your personal SSH key.**
+
+### Action: On Your Laptop
+
+```bash
+# Generate new SSH key pair
+ssh-keygen -t ed25519 -f netiks_deploy_key -C "github-actions-deploy" -N ""
+```
+
+### What This Does:
+- `-t ed25519`: Uses the Ed25519 algorithm (modern, secure)
+- `-f netiks_deploy_key`: Saves key to `netiks_deploy_key` (private) and `netiks_deploy_key.pub` (public)
+- `-C "github-actions-deploy"`: Adds comment for identification
+- `-N ""`: No passphrase (required for CI/CD automation)
+
+### Expected Output:
+
+```
+Generating public/private ed25519 key pair.
+Your identification has been saved in netiks_deploy_key
+Your public key has been saved in netiks_deploy_key.pub
+```
+
+### Verify Keys Were Created:
+
+```bash
+# Check files exist
+ls -la netiks_deploy_key*
+
+# Output should show:
+# -rw------- netiks_deploy_key       (private key - readable only by you)
+# -rw-r--r-- netiks_deploy_key.pub   (public key - readable by anyone)
+```
+<img width="752" height="173" alt="image" src="https://github.com/user-attachments/assets/143bb3cf-5e6d-46e2-93fc-a8cde7df643a" />
+
+---
+
+## Step 3: Add Public Key to VM Deployment User
+
+Add your new public key to the deployment user's `authorized_keys` file.
+
+### Action: Copy Public Key to VM
+
+```bash
+# Create .ssh directory with proper permissions
+sudo mkdir -p /home/deploy/.ssh
+
+# Copy your public key to authorized_keys
+sudo tee /home/deploy/.ssh/authorized_keys < netiks_deploy_key.pub
+
+# Set proper ownership (deploy user owns the directory)
+sudo chown -R deploy:deploy /home/deploy/.ssh
+
+# Set proper permissions
+sudo chmod 700 /home/deploy/.ssh
+sudo chmod 600 /home/deploy/.ssh/authorized_keys
+```
+
+### Expected Output:
+
+<img width="787" height="267" alt="Screenshot 2026-09-15 163004" src="https://github.com/user-attachments/assets/41b4bcbb-f3a7-4481-80d9-467d0c9a9a1e" />
+
+
+### Verify Permissions:
+
+```bash
+# Check directory ownership and permissions
+ls -la /home/deploy/.ssh/
+
+# Output should show:
+# drwx------ deploy deploy .ssh
+# -rw------- deploy deploy authorized_keys
+```
+
+<img width="647" height="281" alt="Screenshot 2026-09-15 163104" src="https://github.com/user-attachments/assets/08781b15-6511-48af-9395-ba6896594b1f" />
+
+
+---
+
+## Step 4: Verify Repository Exists for Deploy User
+
+The deployment user needs access to the repository to check out code.
+
+### Action: Check Repository
+
+```bash
+# Check if repository exists
+ls -la /home/deploy/netiks_store
+
+# If it doesn't exist, clone it:
+sudo -u deploy git clone <your-repository-url> /home/deploy/netiks_store
+
+# Verify deploy user owns it:
+sudo chown -R deploy:deploy /home/deploy/netiks_store
+```
+
+### Expected Output:
+
+<img width="721" height="544" alt="Screenshot 2026-09-15 164052" src="https://github.com/user-attachments/assets/3cd9295b-d62d-431a-90b4-25b6eb94446d" />
+
+---
+
+## Step 5: Test SSH Connection
+
+Verify that you can SSH into the VM as the deployment user.
+
+### Action: Test SSH
+
+```bash
+# Test SSH connection with the new key
+ssh -i netiks_deploy_key deploy@<YOUR_VM_PUBLIC_IP>
+
+# You should get a prompt like:
+# deploy@netiks-vm:~$
+
+# Run a test command
+docker ps
+
+# Should show running containers without sudo
+
+# Exit the SSH session
+exit
+```
+
+### Expected Output:
+
+<img width="808" height="610" alt="Screenshot 2026-09-15 170620" src="https://github.com/user-attachments/assets/ff7f844b-c376-49c3-b226-1c56a4ec1fd1" />
+
+---
+
+## Step 6: Configure GitHub Environment and Secrets
+
+Create a GitHub Environment named `production` with deployment secrets.
+
+### Action 6a: Create GitHub Environment
+
+1. Go to GitHub → Your Repository
+2. Click **Settings** (top navigation)
+3. Click **Environments** (left sidebar)
+4. Click **New environment**
+5. Enter name: `production`
+6. Click **Configure environment**
+
+### Expected Output:
+
+<img width="1040" height="275" alt="Screenshot 2026-09-17 171423" src="https://github.com/user-attachments/assets/bfb171ed-0864-43b0-97bc-5650f4351e65" />
+                     Screenshot of GitHub Environments page showing "production" environment created
+
+---
+
+### Action 6b: Add Environment Secrets
+
+Now add three secrets to the `production` environment:
+
+**Secret 1: DEPLOY_SSH_KEY**
+1. Click **Add secret** under "Secrets"
+2. Name: `DEPLOY_SSH_KEY`
+3. Value: Contents of your `netiks_deploy_key` file (the **private** key)
+   ```bash
+   # On your laptop, display the private key
+   cat netiks_deploy_key
+   # Copy entire output (including -----BEGIN and END lines)
+   ```
+4. Click **Add secret**
+
+**Secret 2: DEPLOY_HOST**
+1. Click **Add secret**
+2. Name: `DEPLOY_HOST`
+3. Value: Your VM's public IP or domain (e.g., `20.29.81.166` or `netiks.example.com`)
+4. Click **Add secret**
+
+**Secret 3: DEPLOY_USER**
+1. Click **Add secret**
+2. Name: `DEPLOY_USER`
+3. Value: `deploy`
+4. Click **Add secret**
+
+### Expected Output:
+<img width="993" height="473" alt="Screenshot 2026-09-16 173646" src="https://github.com/user-attachments/assets/f06fd831-e2da-4d0f-b5c5-eede201b35a3" />
+Screenshot showing three secrets in production environment - showing only names, NOT values.
+
+---
+
+## Part 2 Answer: Why Shouldn't the Deployment User Have `sudo` Access?
+
+### Answer: Why No `sudo` for Deployment User
+
+1. **Principle of Least Privilege:** The deployment user only needs to:
+   - Pull Docker images
+   - Run Docker Compose commands
+   - These don't require `sudo`
+
+2. **Security Boundary:** If the SSH key is compromised:
+   - Attacker can deploy applications
+   - Attacker **cannot** modify system files, kernels, or network configs
+   - Attacker **cannot** access your personal files
+   - Damage is limited to application deployments
+
+3. **Separation of Concerns:** 
+   - Your personal account: Full admin access for maintenance
+   - Deployment account: Only deployment permissions
+   - This separation makes security auditing easier
+
+4. **Audit Trail:** 
+   - Commands run as `deploy` user are clearly for deployments
+   - Commands run as your user are clearly personal/admin
+   - Easier to track who did what
+
+---
+
+## Part 2 Answer: Why Does the Deployment User Need Docker Access?
+
+### Answer: Why Docker Access is Required
+
+1. **Pulling Images:** Docker Compose needs to pull images from Azure Container Registry:
+   ```bash
+   docker compose pull
+   ```
+   This requires Docker daemon access.
+
+2. **Running Services:** Docker Compose creates and runs containers:
+   ```bash
+   docker compose up -d
+   ```
+   This requires Docker daemon access.
+
+3. **Status Checking:** Deployment verification checks running containers:
+   ```bash
+   docker compose ps
+   ```
+   This requires Docker daemon access.
+
+4. **Why Not `sudo`:** 
+   - Granting `sudo` would allow running ANY command as root
+   - Adding to `docker` group restricts access to only Docker operations
+   - This is the more secure approach
+
+5. **Security Consideration:**
+   - The Docker group provides significant privileges but not system-wide root
+   - This is why the lab emphasizes: "should not be treated as equivalent to fully unprivileged"
+   - It's acceptable because the deployment account is single-purpose
+   - If compromised, the scope is limited to Docker/application changes only
+
+---
+
+---
+
+# PART 3: Add a Deployment Job to the Workflow
+
+## Step 1: Update the Workflow File
+
+Extend your `.github/workflows/build-and-push.yml` with a new `deploy` job that runs after successful builds.
+
+### Action: Add Deployment Job
+
+Open `.github/workflows/build-and-push.yml` and add this new job at the end (after the `build-and-push` job):
+
+```yaml
+  deploy:
+    name: 🚀 Deploy to Production
+    needs: build-and-push
+    
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: 🚀 Deploy over SSH
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_SSH_KEY }}
+        script: |
+          set -e
+
+          cd ~/netiks_store
+
+          VERSION="${{ inputs.version || github.ref_name }}"
+
+          git fetch --tags origin
+          git checkout --force "$VERSION"
+
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.prod.yml \
+            pull
+
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.prod.yml \
+            up -d
+
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.prod.yml \
+            ps
+```
+
+### What This Job Does:
+
+- **`name`**: Descriptive name for the workflow
+- **`needs: build-and-push`**: Waits for build-and-push to succeed before starting
+- **`if` condition**: Only runs for version tags (v*) or manual workflow_dispatch triggers
+- **`environment: production`**: Uses production environment with approval gate and secrets
+- **`appleboy/ssh-action@v1`**: GitHub Action that SSH into the VM
+- **SSH credentials**: Uses secrets from the production environment
+- **Script**: Executes deployment commands on the VM
+
+### File Location:
+
+Add this to the end of `.github/workflows/build-and-push.yml`
+
+### Expected Output After Adding:
+<img width="828" height="828" alt="Screenshot 2026-09-17 172058" src="https://github.com/user-attachments/assets/eed4a37e-6e60-41dc-a175-a8d8dff4cd38" />
+Screenshot of updated .github/workflows/build-and-push.yml showing the deploy job
+
+---
+
+## Part 3 Answer: Why Does the `if` Condition Prevent Deployment on Every Push?
+
+### Answer: The `if` Condition Logic
+
+```yaml
+if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+```
+
+This condition means: **Run the deploy job ONLY IF one of these is true:**
+
+1. **`startsWith(github.ref, 'refs/tags/v')`** - The push is a Git tag that starts with `v`
+   - Example: ✅ `v1.2.0` matches
+   - Example: ❌ `feature-branch` doesn't match
+   - Example: ❌ Push to `main` branch doesn't match
+
+2. **`github.event_name == 'workflow_dispatch'`** - The workflow was manually triggered
+   - Used for rollbacks (we'll add this in Part 6c)
+
+#### Why This Prevents Unwanted Deployments:
+
+**Without this condition:**
+- Every push to `main` would trigger deployment
+- Every commit would deploy immediately (before code review!)
+- Would create chaos and instability
+
+**With this condition:**
+- Only intentional releases deploy (when you create a tag)
+- Only manual rollbacks deploy (when you manually trigger)
+- Deployments are planned and controlled
+
+#### Examples:
+
+```
+git push origin main
+→ Triggers: validate job ✅
+→ Triggers: build-and-push job ✅
+→ Triggers: deploy job ❌ (not a tag)
+
+git tag v1.2.0 && git push origin v1.2.0
+→ Triggers: validate job ✅
+→ Triggers: build-and-push job ✅
+→ Triggers: deploy job ✅ (is a tag)
+
+Manually trigger workflow with v1.1.1
+→ Triggers: deploy job ✅ (workflow_dispatch)
+```
+
+---
+
+## Part 3 Answer: Why `needs: build-and-push` Instead of Parallel?
+
+### Answer: Dependency Chain
+
+```yaml
+needs: build-and-push
+```
+
+This means: **Wait for the build-and-push job to complete successfully before starting the deploy job.**
+
+#### Why This Is Required:
+
+1. **Image Availability:** The deploy job pulls Docker images from ACR:
+   ```bash
+   docker compose pull
+   ```
+   These images don't exist until build-and-push creates them.
+
+2. **Deployment Validity:** If builds fail, you don't want to deploy old images:
+   - Build fails → Deploy doesn't run → Production stays at previous version ✅
+   - Build succeeds → Deploy runs → Production gets new images ✅
+
+3. **Logical Sequence:**
+   ```
+   1. Code changes pushed
+   2. Validation runs (linting, tests)
+   3. Build images
+   4. Push images to registry
+   5. Wait for images to be available
+   6. Deploy images to production
+   ```
+
+4. **If Jobs Ran in Parallel:**
+   ```
+   build-and-push starts... (building images)
+   deploy starts immediately... (images don't exist yet!)
+   deploy fails trying to pull non-existent images
+   build-and-push finishes (too late)
+   ```
+
+#### Dependency Flow:
+
+```
+GitHub Push (version tag)
+    ↓
+validate job
+    ↓
+build-and-push job (builds all 7 images)
+    ↓
+deploy job waits for approval (needs: build-and-push)
+    ↓
+Human approves
+    ↓
+deploy job runs
+    ↓
+Production updated
+```
+
+---
+
+---
+
+# PART 4: Release Checklist Becomes a Habit
+
+## Understanding the Release Process
+
+Before creating a release tag, you must ensure `docker-compose.prod.yml` has the correct version for your release.
+
+### Why This Matters:
+
+The deployment job checks out the tag commit:
+```bash
+git checkout --force "$VERSION"  # e.g., v1.2.0
+```
+
+At this commit, the `docker-compose.prod.yml` file must have the matching version:
+```yaml
+services:
+  web:
+    image: netiksstoreregistry.azurecr.io/web:v1.2.0  # ← Must match tag
+```
+
+---
+
+## Step 1: Update `docker-compose.prod.yml`
+
+Before creating a release tag, update all service versions in `docker-compose.prod.yml`.
+
+### Action: Prepare Release v1.2.0
+
+1. Open `docker-compose.prod.yml` in your editor
+2. Update all service image versions from current version (e.g., `v1.1.1`) to new version (`v1.2.0`)
+3. Save the file
+
+### Before (Current):
+
+```yaml
+services:
+  web:
+    image: netiksstoreregistry.azurecr.io/web:v1.1.1
+    pull_policy: always
+  
+  gateway:
+    image: netiksstoreregistry.azurecr.io/gateway:v1.1.1
+    pull_policy: always
+  
+  # ... all other services with v1.1.1
+```
+
+### After (Prepare for v1.2.0):
+
+```yaml
+services:
+  web:
+    image: netiksstoreregistry.azurecr.io/web:v1.2.0
+    pull_policy: always
+  
+  gateway:
+    image: netiksstoreregistry.azurecr.io/gateway:v1.2.0
+    pull_policy: always
+  
+  # ... all other services with v1.2.0
+```
+
+### Expected Output After Edit:
+<img width="735" height="704" alt="Screenshot 2026-09-17 172411" src="https://github.com/user-attachments/assets/7b40afcd-a38b-4484-a3d9-5ee54008555f" />
+PLACEHOLDER: Screenshot of docker-compose.prod.yml with updated versions
+
+---
+
+## Step 2: Commit the Version Update
+
+Commit this change to Git before creating the tag.
+
+### Action: Commit the Change
+
+```bash
+git add docker-compose.prod.yml
+git commit -m "release: v1.2.0"
+```
+
+### Expected Output:
+
+```
+[main 7a2c4d9] release: v1.2.0
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+```
+
+### View the Commit Diff:
+
+```bash
+git show HEAD
+```
+
+This shows exactly what changed in the commit.
+
+### Expected Output:
+<img width="603" height="487" alt="Screenshot 2026-09-16 180941" src="https://github.com/user-attachments/assets/33cbbe83-b21e-4930-81c0-7550a2c0a97b" />
+Screenshot of git show output showing version changes from v1.1.1 to v1.2.0
+
+---
+
+## Step 3: Create Git Tag
+
+Now create the Git tag that points to this commit.
+
+### Action: Tag the Release
+
+```bash
+git tag v1.2.0
+```
+
+### Verify Tag Points to Correct Commit:
+
+```bash
+# Show tag information
+git show v1.2.0
+
+# Should display the commit you just created with the version update
+```
+
+### Expected Output:
+
+```
+tag v1.2.0
+Tagger: Your Name <email@example.com>
+Date:   ...
+
+release: v1.2.0
+
+[Shows the commit hash and changes]
+```
+
+---
+
+## Step 4: Push Tag to GitHub
+
+Push the tag to trigger the CI/CD pipeline.
+
+### Action: Push Tag
+
+```bash
+git push origin main --tags
+
+# Or push specific tag:
+git push origin v1.2.0
+```
+
+### Expected Output:
+
+```
+Enumerating objects: 1, done.
+Counting objects: 100% (1/1), done.
+Total 1 (delta 0), reused 0 (delta 0), reused pack 0 (delta 0)
+To github.com:your-org/netiks_store.git
+ * [new tag]         v1.2.0 -> v1.2.0
+```
+
+---
+
+## Part 4 Answer: What Happens If You Push the Tag Before Committing Version Changes?
+
+### Answer: The Tag Points to Wrong Commit
+
+#### Scenario: You push tag before committing version change
+
+```bash
+# ❌ WRONG - Tag not yet committed
+git tag v1.2.0
+
+# ❌ WRONG - Commit version change after tag
+git add docker-compose.prod.yml
+git commit -m "release: v1.2.0"
+
+git push origin v1.2.0
+```
+
+#### What Goes Wrong:
+
+1. **Tag points to old commit:**
+   ```
+   v1.2.0 tag → points to commit with v1.1.1 in docker-compose.prod.yml
+   ```
+
+2. **Deployment gets wrong images:**
+   - GitHub Actions checks out `v1.2.0` tag
+   - `docker-compose.prod.yml` still has `v1.1.1` images
+   - Deployment pulls old images instead of new ones
+   - Users see old version (bug fix doesn't deploy!)
+
+3. **Version mismatch:**
+   ```
+   Git tag: v1.2.0
+   Image tag: v1.1.1
+   Docker compose image pull: v1.1.1 ❌
+   ```
+
+#### Consequences:
+
+- Release version doesn't match deployed images
+- Debugging is confusing (version numbers don't align)
+- Rollback is difficult (can't trust version tags)
+- CI/CD pipeline integrity is compromised
+
+#### Correct Sequence:
+
+```bash
+# ✅ CORRECT - Version change committed first
+git add docker-compose.prod.yml
+git commit -m "release: v1.2.0"
+
+# ✅ CORRECT - Tag points to this commit
+git tag v1.2.0
+
+# ✅ CORRECT - Push both
+git push origin main --tags
+```
+
+Result:
+```
+v1.2.0 tag → points to commit with v1.2.0 in docker-compose.prod.yml ✅
+```
+
+---
+
+### Release Checklist
+
+Before creating a release, verify:
+
+- [ ] All changes committed to `main` branch
+- [ ] `docker-compose.prod.yml` updated with new version
+- [ ] Version in `docker-compose.prod.yml` matches release version (e.g., both are `v1.2.0`)
+- [ ] Changes committed with message "release: v1.2.0"
+- [ ] Git tag created AFTER commit
+- [ ] Tag pushed to GitHub
+
+---
+
+---
+
+# PART 5: Add a Production Approval Gate
+
+## Step 1: Configure Environment Protection Rule
+
+GitHub Environments can require approval before a workflow can proceed. This ensures a human must approve each production deployment.
+
+### Action: Add Required Reviewer
+
+1. Go to GitHub → Your Repository → Settings
+2. Click **Environments** (left sidebar)
+3. Click on **production** environment
+4. Under "Deployment branches and secrets", click **Add deployment branch rule** (if not already added)
+5. Scroll down to "Required reviewers"
+6. Check the box: **Require reviewers**
+7. Add reviewers:
+   - Type your GitHub username (yourself)
+   - Or add colleagues who should approve deployments
+8. Click **Save protection rules**
+
+### Expected Output:
+
+<img width="1236" height="487" alt="Screenshot 2026-09-16 183851" src="https://github.com/user-attachments/assets/00bc36f3-ea08-406a-880a-bf984ef6129f" />
+
+---
+
+## Step 2: Verify Approval Flow in Workflow
+
+When a workflow runs and references the `production` environment, GitHub will pause at the deployment job and wait for reviewer approval.
+
+### Expected Behavior During Release:
+
+1. Developer pushes version tag → GitHub Actions starts
+2. Validate job runs
+3. Build-and-push job runs and pushes images
+4. Deploy job hits the `production` environment
+5. GitHub pauses the workflow and sends approval request
+6. Required reviewer gets notification
+7. Reviewer clicks "Approve and run" in GitHub Actions
+8. Deployment job resumes and deploys
+9. Services updated on VM
+
+### Expected Output When Waiting for Approval:
+<img width="1890" height="700" alt="Screenshot 2026-09-16 194147" src="https://github.com/user-attachments/assets/cc4e4f27-0b0f-44e7-ae4f-d106f116c5d0" />
+<img width="840" height="515" alt="Screenshot 2026-09-16 194426" src="https://github.com/user-attachments/assets/73cfeec6-f8fc-4aa0-94fa-6ff1cdf4ef19" />
+
+
+---
+
+## Part 5 Answer: Why Should Approval Be on Deployment, Not Build?
+
+### Answer: Separate Concerns
+
+#### Build Job vs. Deployment Job
+
+**Build-and-Push Job:**
+- Creates Docker images
+- Produces artifact
+- Can be built speculatively
+- Doesn't change production
+
+**Deployment Job:**
+- Changes production environment
+- Affects users
+- Should be carefully controlled
+- Requires explicit approval
+
+#### Why Not Require Approval on Build:
+
+1. **Not a Production Change:**
+   - Building an image doesn't affect production
+   - Image just sits in registry unused
+   - No risk to users yet
+
+2. **Multiple Uses for Same Image:**
+   - Same image might deploy to staging, testing, production
+   - Approving once blocks all uses
+   - Inefficient
+
+3. **Artifact vs. Change:**
+   - **Artifact:** Docker image (no impact until deployed)
+   - **Change:** Deployment to production (affects users NOW)
+   - Approval should be on the actual change
+
+#### Why Require Approval on Deploy:
+
+1. **Direct Production Impact:**
+   - Deployment immediately changes what users see
+   - Needs human oversight
+   - Is the actual "point of no return"
+
+2. **Risk Assessment:**
+   - Reviewer can ask: "Is this safe to deploy?"
+   - Reviewer can delay if ongoing incidents
+   - Reviewer can halt if bugs discovered
+
+3. **Accountability:**
+   - Clear record of who approved each deployment
+   - Audit trail shows when changes went to production
+
+#### Real-World Example:
+
+```
+1:00 PM - Developer pushes tag v2.0.0 (build job runs immediately)
+1:02 PM - Build succeeds, images ready in registry
+1:05 PM - Production manager sees deployment waiting for approval
+1:06 PM - Manager checks application dashboard, all metrics healthy
+1:06 PM - Manager approves deployment
+1:06 PM - Deployment starts
+1:07 PM - Users see new features of v2.0.0
+
+vs.
+
+Approval on build (wrong):
+1:00 PM - Build job waits for approval (delays artifact creation)
+1:05 PM - Manager approves build
+1:05 PM - Build runs (why wait if just creating artifact?)
+1:07 PM - Deployment happens (no final approval!)
+```
+
+#### Summary:
+
+| Aspect | Build-Push | Deploy |
+|--------|-----------|--------|
+| **Affects users?** | No | Yes |
+| **Change production?** | No | Yes |
+| **Reversible?** | Yes (delete image) | No (immediate) |
+| **Needs approval?** | No | YES |
+| **Should require reviewer?** | No | YES |
+
+---
+
+---
+
+# PART 6: Test the Pipeline End-to-End
+
+## 6a: Release - Trigger Full Deployment Pipeline
+
+### Step 1: Make Visible Application Change
+
+Make a small, observable change to one of your services so you can verify the deployment worked.
+
+### Option 1: Change Frontend Text
+
+Edit `apps/web/src/app/page.tsx` and add a visible marker:
+
+```tsx
+// Add this somewhere visible on the home page
+<p>Version: v1.2.0 - Deployed at {new Date().toLocaleString()}</p>
+```
+
+Save and commit:
+```bash
+git add apps/web/src/app/page.tsx
+git commit -m "feat: Add version display for Week 5 testing"
+git push origin main
+```
+
+### Option 2: Change an Environment Variable
+
+Edit `.env` and add:
+```bash
+DEPLOYMENT_VERSION=v1.2.0
+```
+
+Commit:
+```bash
+git add .env
+git commit -m "chore: Mark deployment for Week 5 testing"
+git push origin main
+```
+
+---
+
+### Step 2: Update `docker-compose.prod.yml` for Release
+
+Update the version in `docker-compose.prod.yml` to match your release version.
+
+### Current File (Example):
+
+```yaml
+services:
+  web:
+    image: netiksstoreregistry.azurecr.io/web:v1.1.1
+  gateway:
+    image: netiksstoreregistry.azurecr.io/gateway:v1.1.1
+  identity-service:
+    image: netiksstoreregistry.azurecr.io/identity-service:v1.1.1
+  vendor-service:
+    image: netiksstoreregistry.azurecr.io/vendor-service:v1.1.1
+  catalog-service:
+    image: netiksstoreregistry.azurecr.io/catalog-service:v1.1.1
+  media-service:
+    image: netiksstoreregistry.azurecr.io/media-service:v1.1.1
+  admin-service:
+    image: netiksstoreregistry.azurecr.io/admin-service:v1.1.1
+```
+
+### Updated File for v1.2.0:
+
+```yaml
+services:
+  web:
+    image: netiksstoreregistry.azurecr.io/web:v1.2.0
+  gateway:
+    image: netiksstoreregistry.azurecr.io/gateway:v1.2.0
+  identity-service:
+    image: netiksstoreregistry.azurecr.io/identity-service:v1.2.0
+  vendor-service:
+    image: netiksstoreregistry.azurecr.io/vendor-service:v1.2.0
+  catalog-service:
+    image: netiksstoreregistry.azurecr.io/catalog-service:v1.2.0
+  media-service:
+    image: netiksstoreregistry.azurecr.io/media-service:v1.2.0
+  admin-service:
+    image: netiksstoreregistry.azurecr.io/admin-service:v1.2.0
+```
+
+### Commit and Tag:
+
+```bash
+# Commit the version change
+git add docker-compose.prod.yml
+git commit -m "release: v1.2.0"
+
+# Create tag
+git tag v1.2.0
+
+# Push both main and tags
+git push origin main --tags
+```
+
+### Expected Output:
+
+```
+Enumerating objects: 5, done.
+Counting objects: 100% (5/5), done.
+Total 3 (delta 2), reused 0 (delta 0), reused pack 0 (delta 0)
+To github.com:your-org/netiks_store.git
+   abc1234..def5678  main -> main
+ * [new tag]         v1.2.0 -> v1.2.0
+```
+
+---
+
+### Step 3: Monitor GitHub Actions Workflow
+
+Go to GitHub → Your Repository → Actions
+
+Watch the workflow execute in this sequence:
+
+#### 1️⃣ Validate Job Runs
+
+```
+🔍 Validate Code Quality
+├─ Lint Python code
+├─ Lint web application  
+├─ Validate Docker Compose
+└─ ✅ All checks pass
+```
+<img width="1330" height="793" alt="Screenshot 2026-09-16 210151" src="https://github.com/user-attachments/assets/123c2fd0-fc50-449c-90c5-52d526bca1d6" />
+PLACEHOLDER: Screenshot of validate job passing
+
+---
+
+#### 2️⃣ Build-and-Push Job Runs
+
+```
+🐳 Build and Push Images
+├─ Build web image... [latest-commit-sha]
+├─ Build gateway image... [latest-commit-sha]
+├─ Build identity-service... [latest-commit-sha]
+├─ Build vendor-service... [latest-commit-sha]
+├─ Build catalog-service... [latest-commit-sha]
+├─ Build media-service... [latest-commit-sha]
+├─ Build admin-service... [latest-commit-sha]
+└─ ✅ All images pushed to ACR
+```
+
+[PLACEHOLDER: Screenshot of build-and-push job showing all 7 services building]
+
+---
+
+#### 3️⃣ Deploy Job Waits for Approval
+
+```
+🚀 Deploy to Production
+└─ ⏳ Waiting for approval from required reviewers
+```
+<img width="1890" height="700" alt="Screenshot 2026-09-16 194147" src="https://github.com/user-attachments/assets/be7b5bc3-2268-48cb-9417-5e06266cc417" />
+PLACEHOLDER: Screenshot of deploy job in "Waiting" status
+
+---
+
+### Step 4: Approve the Deployment
+
+GitHub sends an approval notification. You (as the required reviewer) must approve.
+
+#### Option 1: Approve from GitHub Actions Page
+
+1. Go to GitHub Actions → Latest workflow run
+2. Click **Review deployments** button
+3. Select the `production` environment
+4. Click **Approve and deploy**
+
+#### Option 2: Approve from Notification
+
+If you received a GitHub notification:
+1. Click the notification
+2. Click **View deployment**
+3. Click **Approve and deploy**
+
+### Expected Output:
+
+<img width="840" height="515" alt="Screenshot 2026-09-16 194426" src="https://github.com/user-attachments/assets/5312c65b-df6b-4115-9b27-60b5a9124309" />
+
+---
+
+### Step 5: Deployment Proceeds
+
+After approval, the deployment job executes:
+
+```
+🚀 Deploy over SSH
+├─ SSH into VM as deploy user
+├─ Change to ~/netiks_store
+├─ Fetch latest tags: git fetch --tags origin
+├─ Checkout v1.2.0: git checkout --force "v1.2.0"
+├─ Pull images: docker compose pull
+├─ Start services: docker compose up -d
+├─ Show status: docker compose ps
+└─ ✅ Deployment complete
+```
+
+### Expected Output:
+
+<img width="1330" height="793" alt="Screenshot 2026-09-16 210151" src="https://github.com/user-attachments/assets/a1d0d139-7c29-4622-b660-6bd3f3b7b848" />
+- docker compose ps showing all 7 services running with v1.2.0 images]
+
+---
+
+## 6b: Verify - Confirm the Deployment
+
+### Step 1: Access the Application
+
+Open your application in a web browser:
+
+```
+http://<YOUR_VM_PUBLIC_IP>/
+```
+
+### Step 2: Check for Your Visible Change
+
+If you added version display to the frontend:
+- Look for "Version: v1.2.0" on the home page
+- Verify the deployed timestamp is recent
+
+### Expected Output:
+
+<img width="1341" height="722" alt="Screenshot 2026-09-16 212944" src="https://github.com/user-attachments/assets/c84b6914-ce3b-44dc-87eb-5a0cf77e4ca5" />
+
+---
+
+### Step 3: Verify Docker Images on VM
+
+SSH into the VM and check that correct images are running:
+
+```bash
+# SSH into VM as deploy user (optional verification)
+ssh -i netiks_deploy_key deploy@<YOUR_VM_IP>
+
+# Check running containers
+docker ps
+
+# Should show v1.2.0 images
+```
+
+### Expected Output:
+
+<img width="1822" height="323" alt="Screenshot 2026-09-16 210819" src="https://github.com/user-attachments/assets/fff7d454-9309-4cf1-8633-10fa28d1893c" />
+PLACEHOLDER: Screenshot of docker ps showing v1.2.0 images
+
+---
+
+## 6c: Rollback - Test Manual Deployment
+
+### Step 1: Add Manual Workflow Trigger
+
+Update `.github/workflows/build-and-push.yml` to support manual deployment.
+
+Find the `on:` section at the top of the workflow and update it:
+
+### Before:
+
+```yaml
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+```
+
+### After:
+
+```yaml
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tag to deploy, e.g. v1.1.0"
+        required: true
+        type: string
+```
+
+### What This Does:
+
+- `workflow_dispatch:` Allows manual workflow triggering
+- `inputs:` Lets you specify which version to deploy
+- Used for rollbacks to previous versions
+
+---
+
+### Step 2: Update Deployment Job for Manual Trigger
+
+Find the `deploy` job and update the version variable to use manual input:
+
+### Before:
+
+```yaml
+deploy:
+  script: |
+    VERSION="${{ github.ref_name }}"
+```
+
+### After:
+
+```yaml
+deploy:
+  script: |
+    VERSION="${{ inputs.version || github.ref_name }}"
+```
+
+### What This Does:
+
+- For tagged push: Uses `github.ref_name` (e.g., `v1.2.0`)
+- For manual trigger: Uses `inputs.version` (e.g., `v1.1.0` for rollback)
+- The `||` means: use inputs.version if provided, otherwise use github.ref_name
+
+---
+
+### Step 3: Commit Workflow Changes
+
+```bash
+git add .github/workflows/build-and-push.yml
+git commit -m "feat: Add manual deployment for rollbacks"
+git push origin main
+```
+
+---
+
+### Step 4: Manually Deploy Previous Version
+
+Now test the manual deployment by rolling back to a previous version.
+
+#### Via GitHub Web Interface:
+
+1. Go to GitHub → Your Repository → Actions
+2. Click **All workflows** (left sidebar)
+3. Click on **🐳 Build and Push Docker Images** workflow
+4. Click **Run workflow** (blue button)
+5. A dropdown appears: "Use workflow from [Branch selector]"
+6. Enter the version you want to deploy: `v1.1.1` (or your previous version)
+7. Click **Run workflow** green button
+
+### Expected Output:
+
+<img width="1328" height="563" alt="Screenshot 2026-09-17 145846" src="https://github.com/user-attachments/assets/7d37e405-be52-4a2a-90fb-7897ff6809b0" />
+
+---
+
+### Step 5: Monitor Rollback Workflow
+
+Go to Actions → Latest workflow run
+
+You should see:
+
+```
+🔍 Validate Code Quality
+└─ ✅ Skipped (workflow_dispatch, no code changes)
+
+🐳 Build and Push Images
+└─ ✅ Skipped (images already built)
+
+🚀 Deploy to Production
+├─ git checkout --force "v1.1.1"
+├─ docker compose pull (pulls v1.1.1 images)
+├─ docker compose up -d (restarts with old images)
+└─ ✅ Rollback complete
+```
+
+### Expected Output:
+
+<img width="1645" height="691" alt="Screenshot 2026-09-17 150242" src="https://github.com/user-attachments/assets/36e29805-5a99-4300-9018-550853757d31" />
+- All steps executing successfully]
+
+---
+
+### Step 6: Verify Rollback Success
+
+#### Check GitHub Actions:
+
+The workflow should complete successfully with v1.1.1 deployed.
+
+<img width="1655" height="766" alt="Screenshot 2026-09-17 150349" src="https://github.com/user-attachments/assets/d1fab6a2-0a81-44b1-9d38-152e61d6aa28" />
+PLACEHOLDER: Screenshot of successful workflow_dispatch deployment
+
+---
+
+#### Check Docker Images on VM:
+
+```bash
+ssh -i netiks_deploy_key deploy@<YOUR_VM_IP>
+
+# Show images before rollback
+docker ps --before-rollback
+
+# Show images after rollback
+docker ps
+```
+
+### Expected Output Before Rollback:
+
+```
+CONTAINER ID  IMAGE                                        STATUS
+abc123...     netiksstoreregistry.azurecr.io/web:v1.2.0   Up 30 minutes
+def456...     netiksstoreregistry.azurecr.io/gateway:v1.2.0  Up 30 minutes
+...
+```
+
+### Expected Output After Rollback:
+
+<img width="1206" height="437" alt="Screenshot 2026-09-17 151251" src="https://github.com/user-attachments/assets/18fa2d3c-7218-4072-b284-551070bf3c2b" />
+Screenshot showing docker ps with v1.1.0 images after rollback
+
+---
+
+#### Check Application:
+
+Visit your application in browser - if you had a version display, it should show the previous version.
+<img width="1511" height="806" alt="Screenshot 2026-09-17 151219" src="https://github.com/user-attachments/assets/6e15cd8b-7eb8-429c-b94b-a22aace34fcb" />
+
+PLACEHOLDER: Screenshot of application showing v1.1.0 deployed
+
+---
+
+### Step 7: Verify Image Version Changed
+
+Compare docker ps outputs before and after rollback:
+
+**Before Rollback (v1.2.0):**
+```
+web:v1.2.0
+gateway:v1.2.0
+identity-service:v1.2.0
+```
+
+**After Rollback (v1.1.0):**
+```
+web:v1.1.0
+gateway:v1.1.0
+identity-service:v1.1.0
+```
+
+Show both outputs in your submission.
+<img width="1666" height="466" alt="image" src="https://github.com/user-attachments/assets/3242ff71-a0e6-4861-904e-12479600ed6b" />
+
+<img width="1206" height="437" alt="Screenshot 2026-09-17 151251" src="https://github.com/user-attachments/assets/61329ab8-3e6d-48fe-a930-62d5590ebc7b" />
+PLACEHOLDER: Side-by-side comparison of docker ps outputs showing version difference
+
+---
+
+
+# SUMMARY
+
+By completing Week 5, I have built:
+
+1. ✅ **Dedicated deployment account** - Secure, single-purpose credentials
+2. ✅ **Automated SSH deployment** - GitHub Actions connects and deploys
+3. ✅ **Production approval gate** - Human oversight before changes
+4. ✅ **Versioned releases** - Clean tagging and deployment
+5. ✅ **Rollback capability** - Manual deployment of previous versions
+
+### The Complete Pipeline:
+
+```
+Developer pushes version tag
+    ↓
+GitHub Actions validates code
+    ↓
+GitHub Actions builds all 7 images
+    ↓
+GitHub Actions pushes to ACR
+    ↓
+GitHub waits for production approval
+    ↓
+Required reviewer approves
+    ↓
+GitHub Actions SSH into VM
+    ↓
+GitHub Actions checks out exact version
+    ↓
+Docker Compose pulls images
+    ↓
+Docker Compose starts services
+    ↓
+Production updated with zero downtime
+    ↓
+Humans can rollback to previous version anytime
+```
+
+### Security Achievements:
+
+- ✅ No personal SSH keys exposed
+- ✅ No shared credentials
+- ✅ Principle of least privilege enforced
+- ✅ Human approval before production changes
+- ✅ Full audit trail of deployments
+- ✅ Easy rollback for incidents
+
+---
+---
 # 🚀 Netiks Store - Week 4 Lab: Azure CI/CD Implementation Guide
 
 ## 📋 **Table of Contents**
