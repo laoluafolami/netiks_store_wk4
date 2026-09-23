@@ -172,3 +172,72 @@ jobs:
               -f docker-compose.yml \
               -f docker-compose.prod.yml \
               ps
+
+  deploy-staging:
+    name: 🎭 Deploy to Staging
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: 🔐 Azure Login (OIDC for ACR Token)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 🎟️ Get Short-Lived ACR Token for Staging
+        id: get_acr_token
+        run: |
+          TOKEN=$(az acr login --name netiksstoreregistry --expose-token --query accessToken -o tsv)
+          echo "::add-mask::$TOKEN"
+          echo "ACR_TOKEN=$TOKEN" >> $GITHUB_ENV
+
+      - name: 🎭 Deploy to Staging over SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          ACR_TOKEN: ${{ env.ACR_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: ACR_TOKEN,COMMIT_SHA
+          script: |
+            set -e
+            
+            echo "🔐 Logging into ACR with OIDC token..."
+            echo "$ACR_TOKEN" | docker login netiksstoreregistry.azurecr.io -u 00000000-0000-0000-0000-000000000000 --password-stdin
+            
+            cd /home/deploy/netiks_store-staging
+            
+            echo "📥 Fetching latest main branch..."
+            git fetch origin main
+            git checkout --force main
+            git reset --hard origin/main
+            
+            echo "🏷️ Setting image tag to commit SHA: $COMMIT_SHA"
+            export IMAGE_TAG="$COMMIT_SHA"
+            export REGISTRY="netiksstoreregistry.azurecr.io"
+            
+            echo "📦 Pulling SHA-tagged images..."
+            docker compose \
+              -p netiks_staging \
+              -f docker-compose.yml \
+              -f docker-compose.staging.yml \
+              pull
+            
+            echo "🚀 Starting staging services..."
+            docker compose \
+              -p netiks_staging \
+              -f docker-compose.yml \
+              -f docker-compose.staging.yml \
+              up -d
+            
+            echo "✅ Staging deployment complete!"
+            docker compose -p netiks_staging ps            
