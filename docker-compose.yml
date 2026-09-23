@@ -25,7 +25,7 @@ services:
       CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://catalog-service:8003}
       MEDIA_SERVICE_URL: ${MEDIA_SERVICE_URL:-http://media-service:8004}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${GATEWAY_EXPOSE_PORT:-8000}:8000"
     depends_on:
       identity-service:
         condition: service_started
@@ -42,7 +42,7 @@ services:
       APP_NAME: identity-service
       APP_PORT: 8001
     ports:
-      - "8001:8001"
+      - "${IDENTITY_EXPOSE_PORT:-8001}:8001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,7 +57,7 @@ services:
       APP_NAME: vendor-service
       APP_PORT: 8002
     ports:
-      - "8002:8002"
+      - "${VENDOR_EXPOSE_PORT:-8002}:8002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,7 +72,7 @@ services:
       APP_NAME: catalog-service
       APP_PORT: 8003
     ports:
-      - "8003:8003"
+      - "${CATALOG_EXPOSE_PORT:-8003}:8003"
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,7 +88,7 @@ services:
       APP_PORT: 8004
       UPLOAD_DIR: /app/uploads
     ports:
-      - "8004:8004"
+      - "${MEDIA_EXPOSE_PORT:-8004}:8004"
     volumes:
       - media_uploads:/app/uploads
 
@@ -102,7 +102,7 @@ services:
       APP_NAME: admin-service
       APP_PORT: 8005
     ports:
-      - "8005:8005"
+      - "${ADMIN_EXPOSE_PORT:-8005}:8005"
     depends_on:
       postgres:
         condition: service_healthy

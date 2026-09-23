@@ -1,0 +1,33 @@
+# Staging environment configuration
+# Usage: docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+
+version: '3.8'
+
+services:
+  web:
+    image: ${REGISTRY}/web:${IMAGE_TAG}
+    pull_policy: always
+
+  gateway:
+    image: ${REGISTRY}/gateway:${IMAGE_TAG}
+    pull_policy: always
+
+  identity-service:
+    image: ${REGISTRY}/identity-service:${IMAGE_TAG}
+    pull_policy: always
+
+  vendor-service:
+    image: ${REGISTRY}/vendor-service:${IMAGE_TAG}
+    pull_policy: always
+
+  catalog-service:
+    image: ${REGISTRY}/catalog-service:${IMAGE_TAG}
+    pull_policy: always
+
+  media-service:
+    image: ${REGISTRY}/media-service:${IMAGE_TAG}
+    pull_policy: always
+
+  admin-service:
+    image: ${REGISTRY}/admin-service:${IMAGE_TAG}
+    pull_policy: always
