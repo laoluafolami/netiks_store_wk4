@@ -166,17 +166,13 @@ jobs:
               ps
 
   deploy-staging:
-    name: 🎭 Deploy to Staging
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: staging
-
     steps:
-      - name: 🎭 Deploy to Staging over SSH
+      - name: Deploy to staging via SSH
         uses: appleboy/ssh-action@v1
-        env:
-          COMMIT_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -199,7 +195,7 @@ jobs:
             git reset --hard origin/main
             
             echo "🏷️ Setting image tag to commit SHA: $COMMIT_SHA"
-            export IMAGE_TAG="$COMMIT_SHA"
+            export IMAGE_TAG="$(echo "$COMMIT_SHA" | cut -c1-7)"
             export REGISTRY="netiksstoreregistry.azurecr.io"
             
             echo "📦 Pulling SHA-tagged images..."
