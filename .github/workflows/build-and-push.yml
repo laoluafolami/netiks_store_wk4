@@ -178,7 +178,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           envs: COMMIT_SHA
-            script: |
+          script: |
             set -e
             
             echo "🔐 Authenticating to Azure using VM Managed Identity..."
