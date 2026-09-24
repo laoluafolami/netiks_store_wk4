@@ -16,3 +16,5 @@ uploads/
 docs/docx_render_out/
 Store/
 sp_credentials.json
+netiks_deploy_key
+netiks_deploy_key.pub
