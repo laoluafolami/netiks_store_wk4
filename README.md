@@ -1672,6 +1672,8 @@ netiks_staging_gateway_1     0.0.0.0:8100->8000/tcp    ← Staging
 
 ✅ Different names, different ports, complete isolation
 ```
+<img width="909" height="365" alt="image" src="https://github.com/user-attachments/assets/8cb5b901-ab07-41a4-b159-057252ac1e55" />
+
 
 ---
 
@@ -1765,9 +1767,8 @@ In nano:
 3. Press `Enter`
 
 **Expected output:**
-```
-File written
-```
+
+<img width="1164" height="603" alt="image" src="https://github.com/user-attachments/assets/4738234b-937e-4d77-a6f1-bd0460d92ba4" />
 
 **[PLACEHOLDER: Screenshot of Nginx staging configuration in nano editor]**
 
@@ -1792,12 +1793,10 @@ ls -la /etc/nginx/sites-enabled/
 ```
 
 **Expected output:**
-```
-lrwxrwxrwx 1 root root   51 Sep 20 12:00 netiks_store -> /etc/nginx/sites-available/netiks_store
-lrwxrwxrwx 1 root root   59 Sep 20 12:05 netiks_store_staging -> /etc/nginx/sites-available/netiks_store_staging
-```
 
-**[PLACEHOLDER: Screenshot showing both production and staging Nginx site links]**
+<img width="869" height="209" alt="image" src="https://github.com/user-attachments/assets/902e5365-a768-4f43-b9dd-d364471ed6c7" />
+
+**Screenshot showing both production and staging Nginx site links**
 
 ---
 
@@ -1810,17 +1809,10 @@ sudo nginx -t
 ```
 
 **Expected output:**
-```
-nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-nginx: configuration file /etc/nginx/nginx.conf test is successful
-```
 
-**If you see errors:**
-- Check for typos in the config file
-- Verify ports match your staging .env
-- Re-edit: `sudo nano /etc/nginx/sites-available/netiks_store_staging`
+<img width="532" height="150" alt="image" src="https://github.com/user-attachments/assets/ee0a9267-2bc3-4ed1-a9b7-02863286413a" />
 
-**[PLACEHOLDER: Screenshot of successful `sudo nginx -t` output]**
+**Screenshot of successful `sudo nginx -t` output**
 
 ---
 
@@ -1846,15 +1838,10 @@ sudo systemctl status nginx
 ```
 
 **Expected output:**
-```
-● nginx.service - A high performance web server and a reverse proxy server
-     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)
-     Active: active (running) since ...
-```
 
-Press `q` to exit.
+<img width="893" height="486" alt="image" src="https://github.com/user-attachments/assets/207d3c79-c93e-49dc-8751-f5b2320c655a" />
 
-**[PLACEHOLDER: Screenshot of nginx status showing active (running)]**
+**PLACEHOLDER: Screenshot of nginx status showing active (running)**
 
 ---
 
@@ -1886,7 +1873,9 @@ Press `q` to exit.
    - **Description:** "Allow access to staging environment"
 4. Click **Add**
 
-**[PLACEHOLDER: Screenshot of Azure NSG inbound rule for port 8080]**
+<img width="562" height="810" alt="image" src="https://github.com/user-attachments/assets/ff28453f-25de-41af-a566-fbc032a4a3f3" />
+
+**Screenshot of Azure NSG inbound rule for port 8080**
 
 ---
 
@@ -1900,24 +1889,9 @@ curl http://<YOUR_VM_IP>:8080/api/v1/system/services
 ```
 
 **Expected output:**
-```json
-{
-  "status": "ok",
-  "services": [
-    {"name": "identity-service", "url": "http://identity-service:8001"},
-    {"name": "vendor-service", "url": "http://vendor-service:8002"},
-    {"name": "catalog-service", "url": "http://catalog-service:8003"},
-    {"name": "media-service", "url": "http://media-service:8004"}
-  ]
-}
-```
+<img width="976" height="200" alt="image" src="https://github.com/user-attachments/assets/f6488be7-4ebe-458f-aca0-7e60bbeb50c5" />
 
-**If connection refused:**
-- Verify Azure NSG rule is saved
-- Check Nginx is running: `sudo systemctl status nginx`
-- Verify staging containers are running: `docker compose -p netiks_staging ps`
-
-**[PLACEHOLDER: Screenshot of successful curl to staging API endpoint]**
+**Screenshot of successful curl to staging API endpoint**
 
 ---
 
@@ -1955,33 +1929,9 @@ g:\projects\netiks_store_wk4\apps\web\src\app\page.tsx
 
 ### Action: Add Version Indicator
 
-Find the return statement and add a visible version banner.
+<img width="1160" height="393" alt="image" src="https://github.com/user-attachments/assets/b96fdbcf-198a-4294-86bc-b9658bda8e28" />
 
-**Add this near the top of the JSX (around line 10-15):**
-
-```tsx
-export default function HomePage() {
-  return (
-    <div className="min-h-screen">
-      {/* Version indicator for Week 6 testing */}
-      <div className="bg-blue-600 text-white text-center py-2 text-sm font-semibold">
-        🎭 STAGING VERSION - Week 6 Lab - Commit: {process.env.NEXT_PUBLIC_COMMIT_SHA || 'latest'}
-      </div>
-      
-      {/* Rest of your existing JSX */}
-      <header>
-        ...
-      </header>
-    </div>
-  );
-}
-```
-
-### Action: Save the File
-
-Press `Ctrl+S`.
-
-**[PLACEHOLDER: Screenshot of page.tsx with version indicator added]**
+**Screenshot of page.tsx with version indicator added]**
 
 ---
 
@@ -2003,18 +1953,10 @@ git push origin main
 ```
 
 **Expected output:**
-```
-Enumerating objects: 9, done.
-Counting objects: 100% (9/9), done.
-Delta compression using up to 8 threads
-Compressing objects: 100% (5/5), done.
-Writing objects: 100% (5/5), 567 bytes | 567.00 KiB/s, done.
-Total 5 (delta 4), reused 0 (delta 0), pack-reused 0
-To github.com:your-org/netiks_store.git
-   ghi9012..jkl3456  main -> main
-```
 
-**[PLACEHOLDER: Screenshot of git push output]**
+<img width="573" height="309" alt="image" src="https://github.com/user-attachments/assets/a4aef517-df05-4d99-b5c8-41dc315e69c6" />
+
+**Screenshot of git push output]**
 
 ---
 
@@ -2036,7 +1978,9 @@ The workflow should run automatically with these jobs:
 
 **Note:** The `🚀 Deploy to Production` job should NOT run (no version tag).
 
-**[PLACEHOLDER: Screenshot of GitHub Actions showing deploy-staging running automatically]**
+<img width="1278" height="571" alt="image" src="https://github.com/user-attachments/assets/27b758ca-6013-445b-bc89-61321ba14a5c" />
+
+**Screenshot of GitHub Actions showing deploy-staging running automatically]**
 
 ---
 
@@ -2046,15 +1990,7 @@ The workflow should run automatically with these jobs:
 
 Watch the deploy-staging job logs until you see:
 
-```
-✅ Staging deployment complete!
-docker compose -p netiks_staging ps
-
-NAME                               IMAGE                                                STATUS
-netiks_staging_web_1              netiksstoreregistry.azurecr.io/web:jkl3456           Up 10 seconds
-netiks_staging_gateway_1          netiksstoreregistry.azurecr.io/gateway:jkl3456       Up 10 seconds
-...
-```
+<img width="1277" height="593" alt="image" src="https://github.com/user-attachments/assets/6012f91e-cd44-4fa5-b304-4d1140395063" />
 
 **[PLACEHOLDER: Screenshot of successful staging deployment logs]**
 
@@ -2064,16 +2000,13 @@ netiks_staging_gateway_1          netiksstoreregistry.azurecr.io/gateway:jkl3456
 
 ### Action: Open Staging in Browser
 
-Navigate to: `http://<YOUR_VM_IP>:8080/`
-
-Example: `http://20.29.81.166:8080/`
+Navigate to: `http://20.29.81.166:8080/`
 
 **You should see:**
-- ✅ Blue banner with "🎭 STAGING VERSION - Week 6 Lab"
-- ✅ Application loads normally
-- ✅ Products visible (if seeded)
 
-**[PLACEHOLDER: Screenshot of staging application showing version indicator]**
+<img width="1513" height="879" alt="image" src="https://github.com/user-attachments/assets/2e88534e-8e8d-473e-89a1-41e3cad80751" />
+
+**Screenshot of staging application showing version indicator**
 
 ---
 
@@ -2090,7 +2023,9 @@ Example: `http://20.29.81.166/`
 - ✅ Application unchanged from previous version
 - ✅ Old version still running
 
-**[PLACEHOLDER: Screenshot of production showing NO version indicator (unchanged)]**
+<img width="1489" height="914" alt="image" src="https://github.com/user-attachments/assets/4d828cc5-28db-4ecd-aadc-342466e7c50a" />
+
+**Screenshot of production showing NO version indicator (unchanged)**
 
 ---
 
