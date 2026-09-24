@@ -144,8 +144,8 @@ jobs:
             
             cd ~/netiks_store
             
-            VERSION="${{ inputs.version || github.ref_name }}"
-            echo "🚀 Deploying version: $VERSION"
+            VERSION="$(git rev-parse HEAD | cut -c1-7)"
+            echo "🚀 Deploying image tag: $IMAGE_TAG"
             
             git fetch --tags --force origin
             git checkout --force "$VERSION"
