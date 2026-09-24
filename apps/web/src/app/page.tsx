@@ -15,6 +15,12 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-[var(--page-wash)] px-4 py-6 md:px-8 md:py-10">
+      {/* 👇 VISIBLE MARKER FOR WEEK 6 LAB (Part 6.1) 👇 */}
+      <div className="mx-auto mb-6 max-w-[84rem] rounded-xl bg-blue-600 text-center py-2 text-sm font-semibold text-white shadow-md">
+        🎭 STAGING VERSION - Week 6 Lab - Commit: {process.env.NEXT_PUBLIC_COMMIT_SHA || 'latest'}
+      </div>
+      {/* 👆 END VISIBLE MARKER 👆 */}
+
       <div className="mx-auto max-w-[84rem] rounded-[2.2rem] bg-[var(--surface)] px-6 py-6 shadow-[0_30px_90px_rgba(88,71,14,0.08)] md:px-10 md:py-8 xl:px-14 xl:py-10">
         <header className="flex flex-col gap-6 border-b border-[var(--line)] pb-8 md:flex-row md:items-center md:justify-between">
           <div>
