@@ -2187,7 +2187,9 @@ Navigate to: `http://<YOUR_VM_IP>/`
 - ✅ Version indicator visible
 - ✅ Same as staging
 
-**[PLACEHOLDER: Screenshot of production showing version indicator (now deployed)]**
+<img width="1510" height="870" alt="image" src="https://github.com/user-attachments/assets/476137d4-55fc-4595-a489-38ccf815600b" />
+
+**PLACEHOLDER: Screenshot of production showing version indicator (now deployed)**
 
 ---
 
@@ -2256,52 +2258,35 @@ docker compose -p netiks_staging stop web
 ```
 
 **Expected output:**
-```
-Stopping netiks_staging_web_1 ... done
-```
+
+<img width="759" height="55" alt="image" src="https://github.com/user-attachments/assets/6258aa3c-6df7-4c88-bc73-ddb650264c4d" />
 
 ---
 
 ### Action: Verify Staging Web is Stopped
 
 ```bash
-docker compose -p netiks_staging ps web
+docker compose ps -a 
 ```
 
 **Expected output:**
-```
-NAME                  IMAGE                                    STATUS
-netiks_staging_web_1  netiksstoreregistry.azurecr.io/web:...  Exited (0) 5 seconds ago
-```
+
+<img width="1411" height="652" alt="image" src="https://github.com/user-attachments/assets/18ce50d6-2778-42ca-899e-7bb0ed546717" />
 
 ---
 
 ### Step 3: Verify Production Still Works
 
-### Action: Check Production Web is Running
-
-```bash
-docker compose ps web
-```
-
-**Expected output:**
-```
-NAME                IMAGE                                         STATUS
-netiks_store_web_1  netiksstoreregistry.azurecr.io/web:v1.3.0    Up 15 minutes
-```
-
-**[PLACEHOLDER: Screenshot showing staging web stopped but production web running]**
-
----
-
 ### Action: Test Production in Browser
 
-Open: `http://<YOUR_VM_IP>/`
+Open: `http://http://20.29.81.166/
 
 **You should see:**
 - ✅ Production works perfectly
 - ✅ Application loads
 - ✅ No errors
+
+<img width="1505" height="911" alt="image" src="https://github.com/user-attachments/assets/2eda2573-9f9f-45cd-b86f-a0f7c9119801" />
 
 **[PLACEHOLDER: Screenshot of production working while staging web is stopped]**
 
@@ -2309,11 +2294,13 @@ Open: `http://<YOUR_VM_IP>/`
 
 ### Action: Test Staging Fails
 
-Open: `http://<YOUR_VM_IP>:8080/`
+Open: `http://20.29.81.166:8080/`
 
-**You should see:**
+**Output:**
 - ❌ "502 Bad Gateway" or connection error
 - ❌ Nginx cannot reach staging web service
+
+<img width="1419" height="493" alt="image" src="https://github.com/user-attachments/assets/1853f5a0-785e-4688-957a-f27ca796772b" />
 
 This proves staging and production are isolated.
 
@@ -2328,36 +2315,24 @@ docker compose -p netiks_staging start web
 ```
 
 **Expected output:**
-```
-Starting netiks_staging_web_1 ... done
-```
+
+<img width="732" height="159" alt="image" src="https://github.com/user-attachments/assets/615eae63-8932-45de-9dd1-3df8afa65d85" />
 
 ---
 
 ### Action: Verify Staging Works Again
 
-Open: `http://<YOUR_VM_IP>:8080/`
+Open: `http://20.29.81.166/:8080/`
 
 **You should see:**
 - ✅ Staging restored
 - ✅ Application loads
 - ✅ Version indicator visible
 
-**[PLACEHOLDER: Screenshot of staging working after being restarted]**
+<img width="1406" height="880" alt="image" src="https://github.com/user-attachments/assets/4de07cb6-f82f-4ed1-879c-10c8c1f7d27e" />
 
----
+**PLACEHOLDER: Screenshot of staging working after being restarted**
 
-## Part 6 Deliverables Checklist
-
-- [✅] Screenshot of automatic staging deployment
-- [✅] Screenshot showing change in staging
-- [✅] Screenshot showing change NOT in production (before promotion)
-- [✅] Screenshot of production approval
-- [✅] Screenshot of successful production deployment
-- [✅] Screenshot showing change NOW in production (after promotion)
-- [✅] `docker compose -p netiks_staging ps` output
-- [✅] `docker compose ps` output (production)
-- [✅] Screenshot of isolation test (staging stopped, production working)
 
 ---
 
