@@ -120,56 +120,56 @@ jobs:
           platforms: linux/amd64
 
   deploy:
-  name: 🚀 Deploy to Production
-  needs: build-and-push
-  if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-  runs-on: ubuntu-latest
-  environment: production
+    name: 🚀 Deploy to Production
+    needs: build-and-push
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: production
 
-  steps:
-    - name: 🚀 Deploy over SSH
-      uses: appleboy/ssh-action@v1
-      with:
-        host: ${{ secrets.DEPLOY_HOST }}
-        username: ${{ secrets.DEPLOY_USER }}
-        key: ${{ secrets.DEPLOY_SSH_KEY }}
-        script: |
-          set -e
-          
-          echo "🔐 Authenticating to Azure using VM Managed Identity..."
-          az login --identity
-          
-          echo "🐳 Logging into ACR..."
-          az acr login --name netiksstoreregistry
-          
-          cd ~/netiks_store
-          
-          # 1. Fetch the latest code FIRST
-          echo "📥 Fetching latest code..."
-          git fetch origin
-          git reset --hard origin/main
-          
-          # 2. Export the variables so Docker Compose can actually see them!
-          export VERSION="$(git rev-parse HEAD | cut -c1-7)"
-          export IMAGE_TAG="$(git rev-parse HEAD | cut -c1-7)"
-          export REGISTRY="netiksstoreregistry.azurecr.io"
-          echo "🚀 Deploying image tag: $IMAGE_TAG"
-          
-          # 3. Pull and start the containers
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.prod.yml \
-            pull
-          
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.prod.yml \
-            up -d
-          
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.prod.yml \
-            ps
+    steps:
+      - name: 🚀 Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            
+            echo "🔐 Authenticating to Azure using VM Managed Identity..."
+            az login --identity
+            
+            echo "🐳 Logging into ACR..."
+            az acr login --name netiksstoreregistry
+            
+            cd ~/netiks_store
+            
+            # 1. Fetch the latest code FIRST
+            echo "📥 Fetching latest code..."
+            git fetch origin
+            git reset --hard origin/main
+            
+            # 2. Export the variables so Docker Compose can actually see them!
+            export VERSION="$(git rev-parse HEAD | cut -c1-7)"
+            export IMAGE_TAG="$(git rev-parse HEAD | cut -c1-7)"
+            export REGISTRY="netiksstoreregistry.azurecr.io"
+            echo "🚀 Deploying image tag: $IMAGE_TAG"
+            
+            # 3. Pull and start the containers
+            docker compose \
+              -f docker-compose.yml \
+              -f docker-compose.prod.yml \
+              pull
+            
+            docker compose \
+              -f docker-compose.yml \
+              -f docker-compose.prod.yml \
+              up -d
+            
+            docker compose \
+              -f docker-compose.yml \
+              -f docker-compose.prod.yml \
+              ps
 
   deploy-staging:
     needs: build-and-push
