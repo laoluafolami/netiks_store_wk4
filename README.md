@@ -2080,11 +2080,9 @@ services:
     pull_policy: always
 ```
 
-### Action: Save docker-compose.prod.yml
+<img width="739" height="677" alt="image" src="https://github.com/user-attachments/assets/c7d3afcb-3cf2-4880-9f4d-ffc63c373ee9" />
 
-Press `Ctrl+S`.
-
-**[PLACEHOLDER: Screenshot of updated docker-compose.prod.yml with v1.3.0]**
+**Screenshot of updated docker-compose.prod.yml with v1.3.0**
 
 ---
 
@@ -2129,8 +2127,9 @@ To github.com:your-org/netiks_store.git
    jkl3456..mno7890  main -> main
  * [new tag]         v1.3.0 -> v1.3.0
 ```
+<img width="517" height="163" alt="image" src="https://github.com/user-attachments/assets/5606c9ba-c596-43ec-8d0c-9533c2fe24c9" />
 
-**[PLACEHOLDER: Screenshot of git push with tag]**
+**Screenshot of git push with tag**
 
 ---
 
@@ -2146,8 +2145,9 @@ The workflow should now run with ALL jobs:
 3. 🎭 Deploy to Staging (automatic)
 4. 🚀 Deploy to Production (waiting for approval) ← NEW!
 ```
+<img width="1641" height="765" alt="image" src="https://github.com/user-attachments/assets/2fa24f5b-0a38-41a5-abe8-6ede0cc1bd18" />
 
-**[PLACEHOLDER: Screenshot showing production deployment waiting for approval]**
+**Screenshot showing production deployment waiting for approval**
 
 ---
 
@@ -2160,7 +2160,9 @@ The workflow should now run with ALL jobs:
 3. Optional: Add approval comment: "Tested in staging, ready for production"
 4. Click **Approve and deploy**
 
-**[PLACEHOLDER: Screenshot of production approval dialog]**
+<img width="658" height="415" alt="Screenshot 2026-09-24 135458" src="https://github.com/user-attachments/assets/bd3795ac-51b0-463a-b65e-2a5ae53e6312" />
+
+**PLACEHOLDER: Screenshot of production approval dialog**
 
 ---
 
@@ -2168,26 +2170,9 @@ The workflow should now run with ALL jobs:
 
 Watch the production deployment logs until complete:
 
-```
-🚀 Deploying version: v1.3.0
+<img width="1254" height="465" alt="image" src="https://github.com/user-attachments/assets/06f4fb12-2a1b-4aa9-bd44-f6a2d0a257e6" />
 
-📥 Checking out v1.3.0...
-Already up to date.
-
-📦 Pulling v1.3.0 images...
-Pulling web              ... done
-Pulling gateway          ... done
-...
-
-🚀 Starting production services...
-Recreating netiks_store_web_1      ... done
-Recreating netiks_store_gateway_1  ... done
-...
-
-✅ Production deployment complete!
-```
-
-**[PLACEHOLDER: Screenshot of successful production deployment]**
+**PLACEHOLDER: Screenshot of successful production deployment**
 
 ---
 
@@ -2242,15 +2227,9 @@ docker compose -p netiks_staging ps
 ```
 
 **Expected output:**
-```
-NAME                               IMAGE                                                STATUS          PORTS
-netiks_staging_web_1              netiksstoreregistry.azurecr.io/web:jkl3456          Up 30 minutes   0.0.0.0:3002->3000/tcp
-netiks_staging_gateway_1          netiksstoreregistry.azurecr.io/gateway:jkl3456      Up 30 minutes   0.0.0.0:8100->8000/tcp
-netiks_staging_identity-service_1 netiksstoreregistry.azurecr.io/identity-service:jkl3456 Up 30 minutes 0.0.0.0:8101->8001/tcp
-...
-```
+<img width="1413" height="367" alt="image" src="https://github.com/user-attachments/assets/25e7f238-1160-45fc-9704-38b98736b106" />
 
-**[PLACEHOLDER: Screenshot of docker compose -p netiks_staging ps output]**
+**PLACEHOLDER: Screenshot of docker compose -p netiks_staging ps output**
 
 ---
 
@@ -2261,15 +2240,10 @@ docker compose ps
 ```
 
 **Expected output:**
-```
-NAME                          IMAGE                                              STATUS          PORTS
-netiks_store_web_1           netiksstoreregistry.azurecr.io/web:v1.3.0         Up 10 minutes   0.0.0.0:3001->3000/tcp
-netiks_store_gateway_1       netiksstoreregistry.azurecr.io/gateway:v1.3.0     Up 10 minutes   0.0.0.0:8000->8000/tcp
-netiks_store_identity-service_1 netiksstoreregistry.azurecr.io/identity-service:v1.3.0 Up 10 minutes 0.0.0.0:8001->8001/tcp
-...
-```
 
-**[PLACEHOLDER: Screenshot of docker compose ps output for production]**
+<img width="1186" height="382" alt="image" src="https://github.com/user-attachments/assets/e6ad4f51-b469-48f3-85fa-efaa6a97b714" />
+
+**PLACEHOLDER: Screenshot of docker compose ps output for production**
 
 ---
 
