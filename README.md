@@ -1,8 +1,6 @@
 # 🚀 Netiks Store - Week 6 Lab: Staging Environment Implementation Guide
 ## Complete Step-by-Step Implementation with Pre-Production Deployment
 
-**Lab Duration:** 1 week  
-**Submission Deadline:** Friday, 25 September, 5:00 PM  
 **Prerequisite:** Week 5 Lab (Production deployment pipeline working)
 
 ---
@@ -627,10 +625,8 @@ Clone a second copy of your repository for the staging environment.
 Execute this command:
 
 ```bash
-sudo -u deploy git clone https://github.com/<YOUR_ORG>/netiks_store.git /home/deploy/netiks_store-staging
+sudo -u deploy git clone https://github.com/laoluafolami/netiks_store_wk4.git /home/deploy/netiks_store-staging
 ```
-
-Replace `<YOUR_ORG>` with your actual GitHub organization or username.
 
 **What this does:**
 - `sudo -u deploy` = Run as the deploy user (not your personal account)
@@ -692,8 +688,6 @@ Locate this section (around line 8):
 **Current state:** Already has `${WEB_EXPOSE_PORT:-3001}` ✅
 
 ### Action: Find the `gateway` Service Ports Section
-
-Locate this section (around line 17):
 
 ```yaml
   gateway:
@@ -1028,21 +1022,7 @@ git push origin main
 **Expected Output:**
 <img width="693" height="333" alt="image" src="https://github.com/user-attachments/assets/ff61c00c-262a-4fd0-a29c-91f0d951f9c7" />
 
-**PLACEHOLDER: Screenshot of git commit and push output**
-
----
-
-## Part 2 Deliverables Checklist
-
-- [✅] Staging directory created: `/home/deploy/netiks_store-staging`
-- [✅] docker-compose.staging.yml created with SHA-tagged images
-- [✅] docker-compose.yml updated with port environment variables
-- [✅] Staging .env file created with different credentials
-- [✅] Verified staging uses separate database name
-- [✅] Verified staging uses different JWT secret
-- [✅] Configuration files committed to Git
-
----
+**Screenshot of git commit and push output**
 
 ---
 
@@ -1070,45 +1050,26 @@ Scroll to the end of the file (after the `deploy` job) and add this new job:
 
 ```yaml
   deploy-staging:
-    name: 🎭 Deploy to Staging
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: staging
-    permissions:
-      contents: read
-      id-token: write
-
     steps:
-      - name: 🔐 Azure Login (OIDC for ACR Token)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-      - name: 🎟️ Get Short-Lived ACR Token for Staging
-        id: get_acr_token
-        run: |
-          TOKEN=$(az acr login --name netiksstoreregistry --expose-token --query accessToken -o tsv)
-          echo "::add-mask::$TOKEN"
-          echo "ACR_TOKEN=$TOKEN" >> $GITHUB_ENV
-
-      - name: 🎭 Deploy to Staging over SSH
+      - name: Deploy to staging via SSH
         uses: appleboy/ssh-action@v1
-        env:
-          ACR_TOKEN: ${{ env.ACR_TOKEN }}
-          COMMIT_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: ACR_TOKEN,COMMIT_SHA
+          envs: COMMIT_SHA
           script: |
             set -e
             
-            echo "🔐 Logging into ACR with OIDC token..."
-            echo "$ACR_TOKEN" | docker login netiksstoreregistry.azurecr.io -u 00000000-0000-0000-0000-000000000000 --password-stdin
+            echo "🔐 Authenticating to Azure using VM Managed Identity..."
+            az login --identity
+            
+            echo "🐳 Logging into ACR..."
+            az acr login --name netiksstoreregistry
             
             cd /home/deploy/netiks_store-staging
             
@@ -1117,9 +1078,10 @@ Scroll to the end of the file (after the `deploy` job) and add this new job:
             git checkout --force main
             git reset --hard origin/main
             
-            echo "🏷️ Setting image tag to commit SHA: $COMMIT_SHA"
-            export IMAGE_TAG="$COMMIT_SHA"
+            echo "🏷️ Getting the short SHA from the current Git commit..."
+            export IMAGE_TAG="$(git rev-parse HEAD | cut -c1-7)"
             export REGISTRY="netiksstoreregistry.azurecr.io"
+            echo "Using IMAGE_TAG=$IMAGE_TAG"
             
             echo "📦 Pulling SHA-tagged images..."
             docker compose \
@@ -1127,14 +1089,14 @@ Scroll to the end of the file (after the `deploy` job) and add this new job:
               -f docker-compose.yml \
               -f docker-compose.staging.yml \
               pull
-            
+              
             echo "🚀 Starting staging services..."
             docker compose \
               -p netiks_staging \
               -f docker-compose.yml \
               -f docker-compose.staging.yml \
               up -d
-            
+              
             echo "✅ Staging deployment complete!"
             docker compose -p netiks_staging ps
 ```
@@ -1151,12 +1113,9 @@ Scroll to the end of the file (after the `deploy` job) and add this new job:
 
 Press `Ctrl+S` to save.
 
-<img width="762" height="847" alt="image" src="https://github.com/user-attachments/assets/a22f6ab0-3c2a-4bb9-8349-b7311d54ff1d" />
-<img width="571" height="72" alt="image" src="https://github.com/user-attachments/assets/dc139c04-8a83-4063-b3bd-46a1ce84b24e" />
-<img width="699" height="838" alt="image" src="https://github.com/user-attachments/assets/31a410b6-9fb3-4939-a1ae-57c31dc5b650" />
-<img width="607" height="263" alt="image" src="https://github.com/user-attachments/assets/c37e9f3b-3095-443e-af38-2897cea63f44" />
+<img width="814" height="943" alt="image" src="https://github.com/user-attachments/assets/bbbf08b0-8a4d-4b7f-8514-1d412b4dfca9" />
 
-**PLACEHOLDER: Screenshot of updated build-and-push.yml showing deploy-staging jobs**
+**Screenshot of updated build-and-push.yml showing deploy-staging jobs**
 
 ---
 
@@ -1228,44 +1187,10 @@ You should see these jobs running in sequence:
 In GitHub Actions, click the `🎭 Deploy to Staging` job to see logs.
 
 **Expected logs should show:**
-```
-🔐 Logging into ACR with OIDC token...
-Login Succeeded
 
-📥 Fetching latest main branch...
-Already up to date.
+<img width="1277" height="593" alt="Screenshot 2026-09-24 100721" src="https://github.com/user-attachments/assets/332ae225-99b0-45ef-b111-6a856812b1fb" />
 
-🏷️ Setting image tag to commit SHA: abc1234567890
-
-📦 Pulling SHA-tagged images...
-Pulling web              ... done
-Pulling gateway          ... done
-Pulling identity-service ... done
-Pulling vendor-service   ... done
-Pulling catalog-service  ... done
-Pulling media-service    ... done
-Pulling admin-service    ... done
-
-🚀 Starting staging services...
-Creating network "netiks_staging_default" ...
-Creating netiks_staging_postgres_1        ... done
-Creating netiks_staging_redis_1           ... done
-Creating netiks_staging_identity-service_1 ... done
-Creating netiks_staging_vendor-service_1   ... done
-Creating netiks_staging_catalog-service_1  ... done
-Creating netiks_staging_media-service_1    ... done
-Creating netiks_staging_gateway_1          ... done
-Creating netiks_staging_web_1              ... done
-
-✅ Staging deployment complete!
-
-NAME                               IMAGE                                                  STATUS
-netiks_staging_web_1              netiksstoreregistry.azurecr.io/web:abc1234567890      Up 10 seconds
-netiks_staging_gateway_1          netiksstoreregistry.azurecr.io/gateway:abc1234567890  Up 10 seconds
-...
-```
-
-**[PLACEHOLDER: Screenshot of successful deploy-staging job logs]**
+**Screenshot of successful deploy-staging job logs**
 
 ---
 
@@ -1390,8 +1315,6 @@ Clear dependency graph
 
 ---
 
----
-
 # PART 4: Configure GitHub Staging Environment
 
 Create a GitHub Environment for staging with deployment credentials.
@@ -1445,7 +1368,7 @@ Staging should deploy automatically without approval.
 
 <img width="1646" height="637" alt="image" src="https://github.com/user-attachments/assets/388b0659-6a2f-40a2-a4a1-ebc7bf8063fd" />
 
-**Screenshot showing staging environment with NO required reviewers configured]**
+**Screenshot showing staging environment with NO required reviewers configured**
 
 ---
 
@@ -1663,17 +1586,8 @@ Staging containers completely unaware!
 # List all containers:
 docker ps --format "table {{.Names}}\t{{.Ports}}"
 
-Output:
-NAME                          PORTS
-netiks_store_web_1           0.0.0.0:3001->3000/tcp    ← Production
-netiks_store_gateway_1       0.0.0.0:8000->8000/tcp    ← Production
-netiks_staging_web_1         0.0.0.0:3002->3000/tcp    ← Staging
-netiks_staging_gateway_1     0.0.0.0:8100->8000/tcp    ← Staging
-
-✅ Different names, different ports, complete isolation
 ```
 <img width="909" height="365" alt="image" src="https://github.com/user-attachments/assets/8cb5b901-ab07-41a4-b159-057252ac1e55" />
-
 
 ---
 
@@ -1689,8 +1603,6 @@ netiks_staging_gateway_1     0.0.0.0:8100->8000/tcp    ← Staging
 
 **Conclusion:**
 > The Docker Compose project name (`-p netiks_staging`) combined with separate directories, ports, networks, and database volumes creates complete isolation. Staging deployments cannot affect production containers, data, or configuration.
-
----
 
 ---
 
@@ -1770,7 +1682,7 @@ In nano:
 
 <img width="1164" height="603" alt="image" src="https://github.com/user-attachments/assets/4738234b-937e-4d77-a6f1-bd0460d92ba4" />
 
-**[PLACEHOLDER: Screenshot of Nginx staging configuration in nano editor]**
+**Screenshot of Nginx staging configuration in nano editor**
 
 ---
 
@@ -1895,18 +1807,6 @@ curl http://<YOUR_VM_IP>:8080/api/v1/system/services
 
 ---
 
-## Part 5 Deliverables Checklist
-
-- [✅] Nginx staging configuration created
-- [✅] nginx -t test passed
-- [✅] Nginx reloaded successfully
-- [✅] Azure NSG rule for port 8080 created
-- [✅] Staging endpoint accessible via port 8080
-
----
-
----
-
 # PART 6: Test the Complete Flow
 
 Now test the complete staging-to-production workflow.
@@ -1956,7 +1856,7 @@ git push origin main
 
 <img width="573" height="309" alt="image" src="https://github.com/user-attachments/assets/a4aef517-df05-4d99-b5c8-41dc315e69c6" />
 
-**Screenshot of git push output]**
+**Screenshot of git push output**
 
 ---
 
@@ -1992,7 +1892,7 @@ Watch the deploy-staging job logs until you see:
 
 <img width="1277" height="593" alt="image" src="https://github.com/user-attachments/assets/6012f91e-cd44-4fa5-b304-4d1140395063" />
 
-**[PLACEHOLDER: Screenshot of successful staging deployment logs]**
+**Screenshot of successful staging deployment logs**
 
 ---
 
@@ -2204,7 +2104,7 @@ Navigate to: `http://<YOUR_VM_IP>:8080/`
 - ✅ Version indicator still visible
 - ✅ Running independently
 
-**[PLACEHOLDER: Screenshot of staging still running after production deployment]**
+**Screenshot of staging still running after production deployment**
 
 ---
 
@@ -2231,7 +2131,7 @@ docker compose -p netiks_staging ps
 **Expected output:**
 <img width="1413" height="367" alt="image" src="https://github.com/user-attachments/assets/25e7f238-1160-45fc-9704-38b98736b106" />
 
-**PLACEHOLDER: Screenshot of docker compose -p netiks_staging ps output**
+**Screenshot of docker compose -p netiks_staging ps output**
 
 ---
 
@@ -2245,7 +2145,7 @@ docker compose ps
 
 <img width="1186" height="382" alt="image" src="https://github.com/user-attachments/assets/e6ad4f51-b469-48f3-85fa-efaa6a97b714" />
 
-**PLACEHOLDER: Screenshot of docker compose ps output for production**
+**Screenshot of docker compose ps output for production**
 
 ---
 
@@ -2288,7 +2188,7 @@ Open: `http://http://20.29.81.166/
 
 <img width="1505" height="911" alt="image" src="https://github.com/user-attachments/assets/2eda2573-9f9f-45cd-b86f-a0f7c9119801" />
 
-**[PLACEHOLDER: Screenshot of production working while staging web is stopped]**
+**Screenshot of production working while staging web is stopped**
 
 ---
 
@@ -2331,7 +2231,7 @@ Open: `http://20.29.81.166/:8080/`
 
 <img width="1406" height="880" alt="image" src="https://github.com/user-attachments/assets/4de07cb6-f82f-4ed1-879c-10c8c1f7d27e" />
 
-**PLACEHOLDER: Screenshot of staging working after being restarted**
+**Screenshot of staging working after being restarted**
 
 
 ---
