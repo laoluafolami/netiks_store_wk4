@@ -1,7 +1,6 @@
 # Week 7 Lab - Submission Report
 ## Monitoring, Health Signals, and Log Visibility
 
-**Student Name:** Afolami Olaoluwa  
 **Date:** 2nd October 2026  
 **Lab:** Week 7 - Monitoring and Health Checks  
 **Environment:** Azure VM with Production and Staging
