@@ -21,18 +21,15 @@ A container status of `Up` only indicates that:
 
 **However, this does NOT mean the application inside is healthy because:**
 
-### 1. Application May Be Stuck
+## 1. Application May Be Stuck
 
-### 2. Application May Have Failed to Initialize
+## 2. Application May Have Failed to Initialize
 
-### 3. Dependencies May Be Unavailable
+## 3. Dependencies May Be Unavailable
 
-### 4. Application May Be Out of Memory
+## 4. Application May Be Out of Memory
 
-### 5. Application May Be Degraded
-
-### Real-World Example
-
+## 5. Application May Be Degraded
 
 ### Why This Happens
 
