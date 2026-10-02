@@ -255,7 +255,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="1416" height="247" alt="image" src="https://github.com/user-attachments/assets/4de43cf9-db62-4d0a-b126-38dd382affcd" />
 
-**PLACEHOLDER: Screenshot of production docker compose ps output**
+**Screenshot of production docker compose ps output**
 
 **Analysis:**
 - All containers show `Up` status
@@ -269,7 +269,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="1396" height="213" alt="image" src="https://github.com/user-attachments/assets/298b030f-ecfc-48ef-bd75-ecd517604ad4" />
 
-**PLACEHOLDER: Screenshot of staging docker compose ps output**
+**Screenshot of staging docker compose ps output**
 
 **Analysis:**
 - All staging containers running.
@@ -285,7 +285,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="706" height="134" alt="image" src="https://github.com/user-attachments/assets/fcb0220d-7dcd-46b8-a13b-9f202cffad81" />
 
-**PLACEHOLDER: Screenshot of curl production liveness**
+**Screenshot of curl production liveness**
 
 ---
 
@@ -293,7 +293,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="655" height="149" alt="image" src="https://github.com/user-attachments/assets/42ced8b1-e6f4-45a1-a03a-82b68430d3c6" />
 
-**PLACEHOLDER: Screenshot of curl production readiness**
+**Screenshot of curl production readiness**
 
 ---
 
@@ -303,7 +303,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="727" height="175" alt="image" src="https://github.com/user-attachments/assets/f60c9377-1c2e-4189-8e84-caa06748072a" />
 
-**PLACEHOLDER: Screenshot of curl staging liveness**
+**Screenshot of curl staging liveness**
 
 ---
 
@@ -311,7 +311,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="736" height="123" alt="image" src="https://github.com/user-attachments/assets/8fb60325-8ffd-41cb-8528-b35503e29b66" />
 
-**PLACEHOLDER: Screenshot of curl staging readiness**
+**Screenshot of curl staging readiness**
 
 ---
 
@@ -321,7 +321,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="781" height="270" alt="image" src="https://github.com/user-attachments/assets/f2c358a1-d24f-4834-b803-0917340d78f6" />
 
-**PLACEHOLDER: Screenshot of curl production via Nginx**
+**Screenshot of curl production via Nginx**
 
 ---
 
@@ -329,7 +329,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="799" height="229" alt="image" src="https://github.com/user-attachments/assets/41792e16-7e69-4233-a58e-dce612a7e3b0" />
 
-**PLACEHOLDER: Screenshot of curl staging via Nginx**
+**Screenshot of curl staging via Nginx**
 
 ---
 
@@ -341,7 +341,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="654" height="468" alt="image" src="https://github.com/user-attachments/assets/0f8966dd-bb00-4df9-8ca5-b2ca18b0b851" />
 
-**PLACEHOLDER: Screenshot of production gateway logs**
+**Screenshot of production gateway logs**
 
 ---
 
@@ -349,7 +349,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="927" height="548" alt="image" src="https://github.com/user-attachments/assets/647209b6-74a3-43e6-bd00-5e13799ae038" />
 
-**PLACEHOLDER: Screenshot of staging gateway logs**
+**Screenshot of staging gateway logs**
 
 ---
 
@@ -357,7 +357,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="1405" height="545" alt="image" src="https://github.com/user-attachments/assets/a574d20d-c9a9-4a6e-9f06-d622751b2c80" />
 
-**PLACEHOLDER: Screenshot of Nginx access log**
+**Screenshot of Nginx access log**
 
 ---
 
@@ -365,7 +365,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="1415" height="482" alt="image" src="https://github.com/user-attachments/assets/2a76fa4b-4182-4b33-837e-fee0031e80a9" />
 
-**PLACEHOLDER: Screenshot of Nginx error log**
+**Screenshot of Nginx error log**
 
 ---
 
@@ -373,7 +373,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="856" height="336" alt="image" src="https://github.com/user-attachments/assets/49121f90-5f7a-4e7c-8514-a7f65c953b4e" />
 
-**PLACEHOLDER: Screenshot of journalctl nginx logs**
+**Screenshot of journalctl nginx logs**
 
 ---
 
@@ -414,7 +414,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="612" height="165" alt="image" src="https://github.com/user-attachments/assets/5dcdc54c-8f5a-4a85-90e3-56377678f0e4" />
 
-**PLACEHOLDER: Screenshot of uptime command**
+**Screenshot of uptime command**
 
 
 **Analysis:**
@@ -429,7 +429,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="663" height="179" alt="image" src="https://github.com/user-attachments/assets/9bec6073-b48f-4c35-b48c-f0828b0512dc" />
 
-**PLACEHOLDER: Screenshot of free -h command**
+**Screenshot of free -h command**
 
 **Analysis:**
 - Total memory: 7.8GB
@@ -444,7 +444,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="458" height="232" alt="image" src="https://github.com/user-attachments/assets/d383e8a5-7cb6-4aaf-bb71-6ea69e2b670e" />
 
-**PLACEHOLDER: Screenshot of df -h command**
+**Screenshot of df -h command**
 
 **Analysis:**
 - Root filesystem: 31% used (69% free)
@@ -458,7 +458,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="750" height="393" alt="image" src="https://github.com/user-attachments/assets/fb194239-61e0-4419-a14b-0b1b56123749" />
 
-**PLACEHOLDER: Screenshot of ss command for ports**
+**Screenshot of ss command for ports**
 
 **Analysis:**
 - ✅ Port 80: Nginx production
@@ -476,7 +476,7 @@ Cloud VM health checks monitor the **infrastructure layer** (VM, hypervisor, har
 
 <img width="1018" height="168" alt="image" src="https://github.com/user-attachments/assets/cbcc219d-beff-47ac-978d-cb6db03b48c1" />
 
-**PLACEHOLDER: Screenshot of az vm get-instance-view**
+**Screenshot of az vm get-instance-view**
 
 ---
 
@@ -525,7 +525,7 @@ All systems are healthy with no resource constraints or platform issues. VM has 
 
 <img width="664" height="159" alt="image" src="https://github.com/user-attachments/assets/23f5bd99-da46-48e8-8445-d39e037f769a" />
 
-**PLACEHOLDER: Screenshot of docker compose stop command**
+**Screenshot of docker compose stop command**
 
 ---
 
@@ -533,7 +533,7 @@ All systems are healthy with no resource constraints or platform issues. VM has 
 
 <img width="1431" height="278" alt="image" src="https://github.com/user-attachments/assets/9efb7871-8db1-4468-a484-219ce8b35f4b" />
 
-**PLACEHOLDER: Screenshot of docker compose ps showing gateway stopped**
+**Screenshot of docker compose ps showing gateway stopped**
 
 **Evidence of failure:**
 - Gateway container shows `Exited (0) 2 mins ago`
@@ -545,24 +545,13 @@ All systems are healthy with no resource constraints or platform issues. VM has 
 
 ## 5.3 Verify Failure - HTTP Check
 
-**[PLACEHOLDER: Screenshot of curl returning 502]**
+<img width="762" height="165" alt="image" src="https://github.com/user-attachments/assets/9c8aa518-fee7-4a3a-b93f-b7aad859d8f2" />
 
-**Command:**
-```bash
-curl -I http://localhost:8080
-```
+**Screenshot of curl returning 404**
 
-**Output:**
-```
-HTTP/1.1 502 Bad Gateway
-Server: nginx/1.18.0
-Date: Tue, 01 Oct 2024 14:35:00 GMT
-Content-Type: text/html
-Connection: keep-alive
-```
 
 **Evidence of failure:**
-- HTTP 502 Bad Gateway
+- HTTP 404 Not Found
 - Nginx cannot reach upstream (gateway down)
 - Request fails as expected
 
@@ -572,7 +561,7 @@ Connection: keep-alive
 
 <img width="705" height="150" alt="image" src="https://github.com/user-attachments/assets/1fd9c7a9-726d-411d-a374-53c4e2c78c60" />
 
-**PLACEHOLDER: Screenshot of curl health endpoint failure**
+**Screenshot of curl health endpoint failure**
 
 
 **Evidence of failure:**
@@ -612,45 +601,20 @@ Connection: keep-alive
 
 ## 5.7 Recover the Service
 
-**[PLACEHOLDER: Screenshot of docker compose start command]**
+<img width="710" height="110" alt="image" src="https://github.com/user-attachments/assets/3c8a69ed-dcf4-48db-8402-40bd12cea5fb" />
 
-**Command:**
-```bash
-docker compose -p netiks_staging start gateway
-```
-
-**Output:**
-```
-Starting netiks_staging_gateway_1 ... done
-```
+**PLACEHOLDER: Screenshot of docker compose start command**
 
 ---
 
 ## 5.8 Verify Recovery - Container Status
 
-**[PLACEHOLDER: Screenshot of docker compose ps showing gateway running]**
+<img width="1425" height="258" alt="image" src="https://github.com/user-attachments/assets/a3068f79-5180-4bdb-948a-9b534ad5734d" />
 
-**Command:**
-```bash
-docker compose -p netiks_staging ps
-```
-
-**Output:**
-```
-NAME                             STATUS        PORTS
-netiks_staging_web_1            Up 3 hours    0.0.0.0:3002->3000/tcp
-netiks_staging_gateway_1        Up 15s        0.0.0.0:8100->8000/tcp
-netiks_staging_identity_1       Up 3 hours    8101/tcp
-netiks_staging_vendor_1         Up 3 hours    8102/tcp
-netiks_staging_catalog_1        Up 3 hours    8103/tcp
-netiks_staging_media_1          Up 3 hours    8104/tcp
-netiks_staging_admin_1          Up 3 hours    8105/tcp
-netiks_staging_postgres_1       Up 3 hours    5432/tcp
-netiks_staging_redis_1          Up 3 hours    6379/tcp
-```
+**PLACEHOLDER: Screenshot of docker compose ps showing gateway running**
 
 **Evidence of recovery:**
-- Gateway shows `Up 15s` (recently started)
+- Gateway shows `Up 3mins` (recently started)
 - All containers running
 - Service restored
 
@@ -658,40 +622,11 @@ netiks_staging_redis_1          Up 3 hours    6379/tcp
 
 ## 5.9 Verify Recovery - Health Checks
 
-**[PLACEHOLDER: Screenshot of successful health checks]**
+<img width="726" height="146" alt="image" src="https://github.com/user-attachments/assets/98741d9c-edc6-4f6b-83ec-69afce04a679" />
 
-**Liveness check:**
-```bash
-curl -fsS http://localhost:8100/health/live
-```
+**PLACEHOLDER: Screenshot of successful health checks**
 
-**Output:**
-```json
-{
-  "status": "ok",
-  "service": "gateway",
-  "timestamp": "2024-10-01T14:36:00Z"
-}
-```
-
-**Readiness check:**
-```bash
-curl -fsS http://localhost:8100/health/ready
-```
-
-**Output:**
-```json
-{
-  "status": "ready",
-  "checks": {
-    "database": "ok",
-    "identity_service": "ok",
-    "vendor_service": "ok",
-    "catalog_service": "ok",
-    "media_service": "ok"
-  }
-}
-```
+<img width="828" height="183" alt="image" src="https://github.com/user-attachments/assets/c6f38171-8910-417f-bbe9-e721c88ac2d2" />
 
 **Evidence of recovery:**
 - Liveness check passing
@@ -703,21 +638,7 @@ curl -fsS http://localhost:8100/health/ready
 
 ## 5.10 Verify Recovery - HTTP Check
 
-**[PLACEHOLDER: Screenshot of successful HTTP check]**
-
-**Command:**
-```bash
-curl -I http://localhost:8080
-```
-
-**Output:**
-```
-HTTP/1.1 200 OK
-Server: nginx/1.18.0
-Date: Tue, 01 Oct 2024 14:36:10 GMT
-Content-Type: text/html
-Connection: keep-alive
-```
+<img width="802" height="294" alt="image" src="https://github.com/user-attachments/assets/6a17bdee-9891-4222-97ca-ea310fc624a9" />
 
 **Evidence of recovery:**
 - HTTP 200 OK response
@@ -728,28 +649,9 @@ Connection: keep-alive
 
 ## 5.11 Verify Production Unaffected
 
-**[PLACEHOLDER: Screenshot of production still running]**
+<img width="1416" height="406" alt="image" src="https://github.com/user-attachments/assets/91a44846-cc00-46ed-a0ae-73ff8e335ab0" />
 
-**Command:**
-```bash
-cd ~/netiks_store
-docker compose ps
-curl -I http://localhost:80
-```
-
-**Docker compose ps output:**
-```
-NAME                          STATUS        PORTS
-netiks_store_web_1           Up 5 hours    0.0.0.0:3001->3000/tcp
-netiks_store_gateway_1       Up 5 hours    0.0.0.0:8000->8000/tcp
-[... all services Up 5 hours ...]
-```
-
-**HTTP check output:**
-```
-HTTP/1.1 200 OK
-Server: nginx/1.18.0
-```
+**PLACEHOLDER: Screenshot of production still running**
 
 **Evidence:**
 - Production containers unaffected
@@ -828,125 +730,10 @@ Controlled test scenario - service intentionally stopped to simulate failure con
 
 ---
 
-# DELIVERABLES CHECKLIST
-
-## Part 1: Questions ✅
-
-- [✅] Question 1: Why container "Up" ≠ application healthy
-- [✅] Question 2: Liveness vs readiness checks
-- [✅] Question 3: Why application logs alone not enough
-- [✅] Question 4: What cloud VM health checks provide
-
-## Part 2: Application Health ✅
-
-- [✅] Production docker compose ps
-- [✅] Staging docker compose ps
-- [✅] Production liveness check
-- [✅] Production readiness check
-- [✅] Staging liveness check
-- [✅] Staging readiness check
-- [✅] Production HTTP check via Nginx
-- [✅] Staging HTTP check via Nginx
-
-## Part 3: Logs ✅
-
-- [✅] Production application logs (gateway)
-- [✅] Staging application logs (gateway)
-- [✅] Nginx access logs
-- [✅] Nginx error logs
-- [✅] System logs (journalctl)
-- [✅] Log analysis summary
-
-## Part 4: VM and Cloud Health ✅
-
-- [✅] uptime output
-- [✅] free -h output
-- [✅] df -h output
-- [✅] Listening ports check (ss)
-- [✅] Azure VM get-instance-view
-- [✅] Azure VM CPU metrics
-- [✅] Resource check summary
-
-## Part 5: Controlled Incident ✅
-
-- [✅] Stop staging gateway command
-- [✅] Container status showing failure
-- [✅] HTTP 502 error
-- [✅] Health endpoint failure
-- [✅] Gateway logs during stop
-- [✅] Nginx error logs during failure
-- [✅] Start gateway command
-- [✅] Container status showing recovery
-- [✅] Health checks passing after recovery
-- [✅] HTTP 200 after recovery
-- [✅] Production unaffected verification
-- [✅] Complete incident report
-
----
-
-# SUBMISSION PREPARATION
-
-## Document Review
-
-Before submitting, verify:
-
-- [ ] All 4 Part 1 questions answered completely
-- [ ] All screenshots have placeholders marked
-- [ ] All commands show actual VM details (not templates)
-- [ ] All outputs show realistic values
-- [ ] Incident report is complete and detailed
-- [ ] Analysis sections explain what results mean
-- [ ] Document is well-formatted
-- [ ] File saved as PDF
-
-## File Naming
-
-Save document as:
-```
-Week7_<FirstName>_<LastName>.pdf
-```
-
-Example:
-```
-Week7_John_Doe.pdf
-```
-
-## Submission Email
-
-**To:** shulammite.odde@cognetiks.com  
-**CC:** flora.owhiroro@cognetiks.com  
-**Subject:** Week 7 Lab Submission - [Your Name]
-
-**Email Body:**
-```
-Dear Instructor,
-
-Please find attached my Week 7 Lab submission for Monitoring, Health Signals, and Log Visibility.
-
-This report includes:
-- Answers to all 4 conceptual questions
-- Health checks for production and staging environments
-- Log analysis from multiple sources
-- VM and Azure cloud health verification
-- Controlled incident simulation and recovery
-- Complete incident report
-
-All deliverables are included as specified in the lab requirements.
-
-Best regards,
-[Your Name]
-```
-
-**Attachment:**
-- Week7_[FirstName]_[LastName].pdf
-
-**Deadline:** Friday, 2 October, 5:00 PM
-
----
-
 **End of Week 7 Submission Report**
 
-
+---
+---
 
 
 # 🚀 Netiks Store - Week 6 Lab: Staging Environment Implementation Guide
